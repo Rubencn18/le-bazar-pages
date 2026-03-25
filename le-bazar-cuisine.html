@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Le Bazar — Cuisine</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0a0a0a; --surface:#111; --surface2:#181818; --surface3:#1f1f1f;
+      --border:rgba(255,255,255,0.08); --border2:rgba(255,255,255,0.14);
+      --text:#fff; --muted:#888; --orange:#ff6614; --orange-dim:rgba(255,102,20,0.15);
+      --green:#4caf7d; --green-dim:rgba(76,175,125,0.12);
+      --yellow:#f5c518; --yellow-dim:rgba(245,197,24,0.12);
+      --red:#e05050;
+    }
+    html,body{height:100%;font-family:'Montserrat',sans-serif;background:var(--bg);color:var(--text);font-size:13px;-webkit-font-smoothing:antialiased}
+    button{cursor:pointer;font-family:inherit}
+
+    /* ── HEADER ── */
+    #header{
+      height:56px;background:var(--surface);border-bottom:1px solid var(--border);
+      display:flex;align-items:center;justify-content:space-between;padding:0 20px;
+      position:sticky;top:0;z-index:100;
+    }
+    .hdr-left{display:flex;align-items:center;gap:20px}
+    .hdr-logo{font-size:16px;font-weight:800;letter-spacing:5px}
+    .hdr-tag{font-size:10px;color:var(--muted);letter-spacing:3px;text-transform:uppercase}
+    .live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+    .hdr-right{display:flex;align-items:center;gap:10px}
+    .filter-btn{
+      padding:6px 14px;background:transparent;border:1px solid var(--border2);
+      color:var(--muted);font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;
+      transition:all .15s;
+    }
+    .filter-btn.active{background:var(--orange);border-color:var(--orange);color:#fff}
+    .filter-btn:hover:not(.active){border-color:var(--orange);color:var(--orange)}
+    #cmd-total-badge{
+      background:var(--orange-dim);border:1px solid rgba(255,102,20,.3);color:var(--orange);
+      padding:5px 12px;font-size:11px;font-weight:700;letter-spacing:1px;
+    }
+
+    /* ── BOARD ── */
+    #board{
+      padding:16px;display:flex;flex-wrap:wrap;gap:14px;align-content:flex-start;
+      min-height:calc(100vh - 56px);
+    }
+    .empty-board{
+      width:100%;text-align:center;padding:100px 20px;color:var(--muted);
+    }
+    .empty-board-icon{font-size:48px;margin-bottom:16px}
+    .empty-board-title{font-size:16px;font-weight:600;color:var(--text);margin-bottom:8px}
+
+    /* ── TICKET CARD ── */
+    .ticket{
+      background:var(--surface);border:1px solid var(--border);
+      width:280px;flex-shrink:0;display:flex;flex-direction:column;
+      position:relative;overflow:hidden;
+    }
+    .ticket::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+    .ticket.statut-en-attente::before{background:var(--orange)}
+    .ticket.statut-en-preparation::before{background:var(--yellow)}
+    .ticket.statut-pret::before{background:var(--green)}
+
+    .ticket-header{
+      padding:12px 14px 10px;border-bottom:1px solid var(--border);
+      display:flex;align-items:flex-start;justify-content:space-between;gap:8px;
+    }
+    .ticket-table{font-size:18px;font-weight:800;letter-spacing:2px;color:var(--text)}
+    .ticket-meta{font-size:10px;color:var(--muted);margin-top:2px;letter-spacing:.5px}
+    .ticket-status-pill{
+      font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+      padding:3px 8px;border:1px solid;flex-shrink:0;
+    }
+    .statut-en-attente  .ticket-status-pill{color:var(--orange);border-color:rgba(255,102,20,.4);background:var(--orange-dim)}
+    .statut-en-preparation .ticket-status-pill{color:var(--yellow);border-color:rgba(245,197,24,.4);background:var(--yellow-dim)}
+    .statut-pret        .ticket-status-pill{color:var(--green);border-color:rgba(76,175,125,.4);background:var(--green-dim)}
+
+    .ticket-items{padding:10px 14px;flex:1}
+    .ticket-item{
+      display:flex;justify-content:space-between;align-items:flex-start;
+      padding:6px 0;border-bottom:1px solid var(--border);gap:8px;
+    }
+    .ticket-item:last-child{border-bottom:none}
+    .ticket-item-name{font-size:13px;font-weight:600}
+    .ticket-item-note{font-size:10px;color:var(--orange);margin-top:2px;font-style:italic}
+    .ticket-item-qty{
+      font-size:15px;font-weight:800;color:var(--orange);
+      min-width:28px;text-align:right;flex-shrink:0;
+    }
+
+    .ticket-note-global{
+      margin:0 14px 10px;padding:8px 10px;
+      background:rgba(255,255,255,0.03);border:1px solid var(--border);border-left:2px solid var(--muted);
+      font-size:11px;color:var(--muted);font-style:italic;
+    }
+
+    .ticket-footer{
+      padding:10px 14px;border-top:1px solid var(--border);
+      display:flex;gap:6px;flex-wrap:wrap;
+    }
+    .btn-statut{
+      flex:1;padding:8px 6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+      border:1px solid;transition:all .15s;
+    }
+    .btn-en-prep{background:transparent;border-color:rgba(245,197,24,.4);color:var(--yellow)}
+    .btn-en-prep:hover{background:var(--yellow-dim)}
+    .btn-pret{background:transparent;border-color:rgba(76,175,125,.4);color:var(--green)}
+    .btn-pret:hover{background:var(--green-dim)}
+    .btn-print{
+      padding:8px 10px;background:transparent;border:1px solid var(--border2);color:var(--muted);
+      font-size:12px;transition:all .15s;
+    }
+    .btn-print:hover{border-color:var(--text);color:var(--text)}
+    .btn-archive{
+      width:100%;padding:7px;background:transparent;border:1px solid var(--border);color:var(--muted);
+      font-size:10px;letter-spacing:1px;text-transform:uppercase;transition:all .15s;margin-top:2px;
+    }
+    .btn-archive:hover{border-color:var(--red);color:var(--red)}
+    .ticket-time{
+      position:absolute;bottom:0;right:0;
+      font-size:9px;color:var(--muted);padding:3px 6px;letter-spacing:.5px;
+    }
+
+    /* ── TOAST ── */
+    #toast{
+      position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+      background:#1a1a1a;border:1px solid var(--border2);border-left:3px solid var(--green);
+      padding:10px 20px;font-size:12px;font-weight:600;letter-spacing:.5px;
+      z-index:9999;display:none;white-space:nowrap;
+    }
+
+    /* ══════════════════════════════════════════
+       PRINT STYLES — ticket 80mm
+    ══════════════════════════════════════════ */
+    @media print {
+      * { color: #000 !important; background: #fff !important; border-color: #ccc !important; }
+      body { margin: 0; font-family: 'Courier New', monospace; font-size: 12px; }
+      #header, #board, #toast { display: none !important; }
+      #print-zone { display: block !important; }
+      @page { size: 80mm auto; margin: 4mm; }
+    }
+    #print-zone { display: none; }
+
+    .print-ticket {
+      width: 72mm; font-family: 'Courier New', monospace; font-size: 12px;
+    }
+    .print-header {
+      text-align: center; border-bottom: 1px dashed #000;
+      padding-bottom: 8px; margin-bottom: 8px;
+    }
+    .print-restaurant { font-size: 16px; font-weight: bold; letter-spacing: 4px; }
+    .print-sub { font-size: 10px; }
+    .print-info { margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 6px; }
+    .print-info-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
+    .print-info-label { font-weight: bold; }
+    .print-items { margin-bottom: 8px; }
+    .print-item { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    .print-item-left { flex: 1; }
+    .print-item-note { font-size: 10px; font-style: italic; padding-left: 8px; }
+    .print-item-qty { font-weight: bold; min-width: 24px; text-align: right; }
+    .print-total { border-top: 1px dashed #000; padding-top: 6px; margin-top: 4px; font-weight: bold; }
+    .print-footer { text-align: center; margin-top: 10px; font-size: 10px; border-top: 1px dashed #000; padding-top: 6px; }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header id="header">
+  <div class="hdr-left">
+    <div class="hdr-logo">LE BAZAR</div>
+    <div class="hdr-tag">🍳 Cuisine</div>
+    <div class="live-dot" id="live-dot"></div>
+  </div>
+  <div class="hdr-right">
+    <span id="cmd-total-badge">0 commande</span>
+    <button class="filter-btn active" id="filter-all"   onclick="setFilter('all')">Tout</button>
+    <button class="filter-btn"        id="filter-att"   onclick="setFilter('En attente')">En attente</button>
+    <button class="filter-btn"        id="filter-prep"  onclick="setFilter('En préparation')">En prép.</button>
+    <button class="filter-btn"        id="filter-pret"  onclick="setFilter('Prêt')">Prêt</button>
+  </div>
+</header>
+
+<!-- BOARD -->
+<div id="board">
+  <div class="empty-board">
+    <div class="empty-board-icon">🍽️</div>
+    <div class="empty-board-title">Aucune commande active</div>
+    <div>Les commandes apparaissent ici en temps réel.</div>
+  </div>
+</div>
+
+<!-- PRINT ZONE (hidden, injected before print) -->
+<div id="print-zone"></div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+const SUPA_URL  = 'https://gtjvsrhblqwwnviledmo.supabase.co';
+const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd0anZzcmhibHF3d252aWxlZG1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNjk2NTYsImV4cCI6MjA4OTc0NTY1Nn0.Om-tFf8iIGsTXjWY4l95ApAF6hRP-s5ddsMco_0TPyM';
+
+const db = supabase.createClient(SUPA_URL, SUPA_ANON);
+
+let commandes   = [];   // local cache [{...commande, items:[]}]
+let currentFilter = 'all';
+
+// ── INIT ──────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  await loadCommandes();
+  subscribeRealtime();
+});
+
+// ── LOAD ──────────────────────────────────
+async function loadCommandes() {
+  const { data, error } = await db
+    .from('commandes_salle')
+    .select('*, commandes_salle_items(*)')
+    .not('statut', 'eq', 'Archivé')
+    .order('created_at', { ascending: true });
+
+  if (error) { showToast('Erreur chargement'); return; }
+  commandes = (data || []).map(c => ({ ...c, items: c.commandes_salle_items || [] }));
+  renderBoard();
+}
+
+// ── REALTIME ──────────────────────────────
+function subscribeRealtime() {
+  db.channel('cuisine-live')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'commandes' }, async payload => {
+      await loadCommandes();
+      if (payload.eventType === 'INSERT') {
+        playBell();
+        showToast(`🆕 Nouvelle commande — ${payload.new.table_nom}`);
+      }
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'commandes_salle_items' }, () => {
+      loadCommandes();
+    })
+    .subscribe(status => {
+      document.getElementById('live-dot').style.background =
+        status === 'SUBSCRIBED' ? 'var(--green)' : 'var(--muted)';
+    });
+}
+
+// ── RENDER ────────────────────────────────
+function renderBoard() {
+  const board = document.getElementById('board');
+  const badge = document.getElementById('cmd-total-badge');
+
+  let displayed = commandes;
+  if (currentFilter !== 'all') displayed = commandes.filter(c => c.statut === currentFilter);
+
+  const activeCount = commandes.filter(c => c.statut !== 'Archivé').length;
+  badge.textContent = activeCount + ' commande' + (activeCount > 1 ? 's' : '');
+
+  if (displayed.length === 0) {
+    board.innerHTML = `<div class="empty-board">
+      <div class="empty-board-icon">🍽️</div>
+      <div class="empty-board-title">${currentFilter === 'all' ? 'Aucune commande active' : 'Aucune commande «' + currentFilter + '»'}</div>
+      <div>Les commandes apparaissent ici en temps réel.</div>
+    </div>`;
+    return;
+  }
+
+  board.innerHTML = displayed.map(c => ticketHTML(c)).join('');
+}
+
+function statutClass(s) {
+  if (s === 'En attente')     return 'statut-en-attente';
+  if (s === 'En préparation') return 'statut-en-preparation';
+  if (s === 'Prêt')           return 'statut-pret';
+  return '';
+}
+
+function ticketHTML(c) {
+  const time = c.created_at
+    ? new Date(c.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    : '';
+
+  const itemsHTML = (c.items || []).map(it => `
+    <div class="ticket-item">
+      <div>
+        <div class="ticket-item-name">${it.nom}</div>
+        ${it.notes ? `<div class="ticket-item-note">↳ ${it.notes}</div>` : ''}
+      </div>
+      <div class="ticket-item-qty">×${it.quantite}</div>
+    </div>`).join('');
+
+  const noteHTML = c.notes
+    ? `<div class="ticket-note-global">📝 ${c.notes}</div>` : '';
+
+  const btnPrep = c.statut === 'En attente'
+    ? `<button class="btn-statut btn-en-prep" onclick="updateStatut('${c.id}', 'En préparation')">▶ En prép.</button>` : '';
+  const btnPret = c.statut !== 'Prêt'
+    ? `<button class="btn-statut btn-pret" onclick="updateStatut('${c.id}', 'Prêt')">✓ Prêt</button>` : '';
+
+  return `
+  <div class="ticket ${statutClass(c.statut)}" id="ticket-${c.id}">
+    <div class="ticket-header">
+      <div>
+        <div class="ticket-table">${c.table_nom}</div>
+        <div class="ticket-meta">${c.serveur ? c.serveur + ' · ' : ''}${time}</div>
+      </div>
+      <div class="ticket-status-pill">${c.statut}</div>
+    </div>
+    <div class="ticket-items">${itemsHTML}</div>
+    ${noteHTML}
+    <div class="ticket-footer">
+      ${btnPrep}${btnPret}
+      <button class="btn-print" onclick="printTicket('${c.id}')" title="Imprimer">🖨️</button>
+    </div>
+    <button class="btn-archive" onclick="archiveCmd('${c.id}')">✕ Archiver</button>
+    <div class="ticket-time">${time}</div>
+  </div>`;
+}
+
+// ── ACTIONS ───────────────────────────────
+async function updateStatut(cmdId, newStatut) {
+  await db.from('commandes_salle').update({ statut: newStatut, updated_at: new Date().toISOString() }).eq('id', cmdId);
+  const c = commandes.find(x => x.id === cmdId);
+  if (c) c.statut = newStatut;
+  renderBoard();
+}
+
+async function archiveCmd(cmdId) {
+  await db.from('commandes_salle').update({ statut: 'Archivé', updated_at: new Date().toISOString() }).eq('id', cmdId);
+  commandes = commandes.filter(c => c.id !== cmdId);
+  renderBoard();
+}
+
+// ── FILTER ────────────────────────────────
+function setFilter(f) {
+  currentFilter = f;
+  ['all','att','prep','pret'].forEach(k => document.getElementById('filter-' + k)?.classList.remove('active'));
+  const map = { all:'filter-all', 'En attente':'filter-att', 'En préparation':'filter-prep', 'Prêt':'filter-pret' };
+  document.getElementById(map[f])?.classList.add('active');
+  renderBoard();
+}
+
+// ── PRINT ─────────────────────────────────
+function printTicket(cmdId) {
+  const c = commandes.find(x => x.id === cmdId);
+  if (!c) return;
+
+  const now = new Date();
+  const time = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const date = now.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  const total = (c.items || []).reduce((s, it) => s + it.prix * it.quantite, 0);
+
+  const itemsHTML = (c.items || []).map(it => `
+    <div class="print-item">
+      <div class="print-item-left">
+        <div>${it.nom}</div>
+        ${it.notes ? `<div class="print-item-note">↳ ${it.notes}</div>` : ''}
+      </div>
+      <div class="print-item-qty">×${it.quantite}</div>
+    </div>`).join('');
+
+  document.getElementById('print-zone').innerHTML = `
+  <div class="print-ticket">
+    <div class="print-header">
+      <div class="print-restaurant">LE BAZAR</div>
+      <div class="print-sub">Bon de commande cuisine</div>
+    </div>
+    <div class="print-info">
+      <div class="print-info-row"><span class="print-info-label">TABLE</span><span>${c.table_nom}</span></div>
+      <div class="print-info-row"><span class="print-info-label">SERVEUR</span><span>${c.serveur || '—'}</span></div>
+      <div class="print-info-row"><span class="print-info-label">N° CMD</span><span>${c.id}</span></div>
+      <div class="print-info-row"><span class="print-info-label">HEURE</span><span>${date} ${time}</span></div>
+    </div>
+    <div class="print-items">${itemsHTML}</div>
+    ${c.notes ? `<div style="margin-top:6px;font-style:italic;font-size:11px;border-top:1px dashed #000;padding-top:4px;">📝 ${c.notes}</div>` : ''}
+    <div class="print-footer">— LE BAZAR · Levallois-Perret —</div>
+  </div>`;
+
+  window.print();
+}
+
+// ── BELL ──────────────────────────────────
+function playBell() {
+  try {
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sine'; osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.4, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.8);
+  } catch(e) {}
+}
+
+// ── TOAST ─────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.style.display = 'none', 4000);
+}
+</script>
+</body>
+</html>

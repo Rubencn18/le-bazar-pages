@@ -1,0 +1,3119 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Le Bazar — Réservations</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
+
+    /* ─── Reset & Variables ─── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:          #000000;
+      --surface:     #0a0a0a;
+      --surface2:    #111111;
+      --surface3:    #181818;
+      --border:      rgba(255,255,255,0.07);
+      --border2:     rgba(255,255,255,0.12);
+      --text:        #ffffff;
+      --muted:       #a0a09f;
+      --orange:      #ff6614;
+      --orange-dim:  rgba(255,102,20,0.12);
+      --orange-glow: rgba(255,102,20,0.25);
+      --green:       #4caf7d;
+      --green-dim:   rgba(76,175,125,0.10);
+      --red:         #e05050;
+      --red-dim:     rgba(224,80,80,0.12);
+      --radius:      2px;
+      --shadow:      0 8px 40px rgba(0,0,0,0.8);
+    }
+    html, body {
+      height: 100%;
+      font-family: 'Montserrat', Arial, sans-serif;
+      background: var(--bg); color: var(--text);
+      font-size: 13px; line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    input, select, textarea, button { font-family: inherit; font-size: inherit; }
+    button { cursor: pointer; }
+    a { color: var(--orange); }
+
+    /* ─── Scrollbar ─── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); }
+
+    /* ══════════════════════════════════════════
+       LOGIN SCREEN
+    ══════════════════════════════════════════ */
+    #screen-login {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh;
+      background: #000;
+    }
+    .login-card {
+      background: transparent;
+      border: 1px solid var(--border2);
+      padding: 48px 40px; width: 380px;
+      position: relative;
+    }
+    .login-card::before {
+      content: ''; position: absolute; inset: -1px;
+      border: 1px solid var(--orange);
+      opacity: 0.3; pointer-events: none;
+    }
+    .login-logo { text-align: center; margin-bottom: 32px; }
+    .login-logo img { height: 70px; width: auto; object-fit: contain; }
+    .login-sub { color: var(--muted); text-align: center; margin-bottom: 32px; font-size: 11px; text-transform: uppercase; letter-spacing: 3px; font-weight: 400; }
+    .login-card label {
+      display: block; font-size: 10px; font-weight: 600; color: var(--muted);
+      margin-bottom: 6px; text-transform: uppercase; letter-spacing: 2px;
+    }
+    .login-card input {
+      width: 100%; padding: 12px 14px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border2);
+      color: var(--text); margin-bottom: 20px;
+      transition: border-color .2s; outline: none;
+      font-size: 13px; letter-spacing: .5px;
+    }
+    .login-card input:focus { border-color: var(--orange); }
+    .login-card button[type=submit] {
+      width: 100%; padding: 13px;
+      background: transparent; color: #fff;
+      border: 1px solid #fff;
+      font-weight: 600; font-size: 11px; letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-top: 8px; transition: all .2s;
+    }
+    .login-card button[type=submit]:hover {
+      background: var(--orange); border-color: var(--orange);
+    }
+    #login-error { color: var(--red); font-size: 11px; margin-top: 14px; text-align: center; min-height: 18px; letter-spacing: 1px; }
+
+    /* ══════════════════════════════════════════
+       DASHBOARD LAYOUT
+    ══════════════════════════════════════════ */
+    #screen-dashboard { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+    /* ─── Header ─── */
+    #app-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 24px; height: 60px; flex-shrink: 0;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 16px; }
+    .app-logo img { height: 30px; width: auto; object-fit: contain; }
+    .live-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: var(--muted);
+      transition: background .3s;
+    }
+    .live-dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    .header-center { display: flex; align-items: center; gap: 10px; }
+    .nav-day-btn {
+      background: transparent; border: 1px solid var(--border2);
+      color: var(--muted); width: 28px; height: 28px;
+      font-size: 15px; display: flex; align-items: center; justify-content: center;
+      transition: all .15s;
+    }
+    .nav-day-btn:hover { border-color: var(--orange); color: var(--orange); }
+    #date-picker {
+      background: transparent; border: 1px solid var(--border2);
+      color: var(--text); padding: 5px 10px; cursor: pointer;
+      font-size: 12px; letter-spacing: .5px;
+    }
+    #date-picker:focus { outline: none; border-color: var(--orange); }
+    .date-label {
+      font-size: 11px; font-weight: 500; white-space: nowrap;
+      text-transform: uppercase; letter-spacing: 2px; color: var(--muted);
+    }
+
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .user-badge { font-size: 11px; color: var(--muted); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: .5px; }
+    #btn-logout {
+      background: transparent; border: 1px solid var(--border2); color: var(--muted);
+      padding: 5px 14px; font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+      transition: all .15s;
+    }
+    #btn-logout:hover { border-color: var(--orange); color: var(--orange); }
+
+    /* ─── Main ─── */
+    #app-main { display: flex; flex: 1; overflow: hidden; }
+
+    /* ─── Logo watermark ─── */
+    #bg-logo {
+      position: fixed;
+      top: 50%; left: calc((100% - 330px) / 2);
+      transform: translate(-50%, -50%);
+      width: 600px; height: auto;
+      opacity: 0.18;
+      pointer-events: none;
+      z-index: 0;
+      mix-blend-mode: screen;
+      filter: grayscale(1) brightness(1.5);
+      user-select: none;
+    }
+
+    /* ─── Floor Plan ─── */
+    #floor-plan {
+      flex: 1; overflow-y: auto; padding: 20px;
+      display: flex; flex-direction: column; gap: 16px;
+      background: transparent;
+      position: relative;
+      z-index: 1;
+    }
+    .zone-section { position: relative; z-index: 1; }
+    .zone-section {
+      background: rgba(10,10,10,0.75);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      backdrop-filter: blur(0px);
+    }
+    .zone-header {
+      padding: 12px 18px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(17,17,17,0.8);
+    }
+    .zone-title {
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 3px; color: var(--text);
+    }
+    .zone-badge {
+      font-size: 10px; color: var(--muted);
+      letter-spacing: 1px; text-transform: uppercase;
+    }
+    .zone-tables { display: flex; flex-wrap: wrap; gap: 10px; padding: 14px; align-items: flex-start; }
+
+    /* ─── Table card ─── */
+    .table-card {
+      padding: 14px 12px; border: 1px solid var(--border);
+      cursor: pointer; transition: all .2s; position: relative;
+      background: rgba(17,17,17,0.8); min-height: 96px;
+      display: flex; flex-direction: column; gap: 5px;
+    }
+    .table-card::after {
+      content: ''; position: absolute; bottom: 0; left: 0; right: 0;
+      height: 2px; background: transparent; transition: background .2s;
+    }
+    .table-card:hover { background: var(--surface3); }
+    .table-card:hover::after { background: var(--orange); }
+
+    .table-card.libre   { border-color: rgba(76,175,125,0.25); }
+    .table-card.libre::after { background: var(--green); opacity: .6; }
+    .table-card.reservee { border-color: rgba(255,102,20,0.4); background: rgba(255,102,20,0.05); }
+    .table-card.reservee::after { background: var(--orange); }
+    .table-card.inactive { border-color: var(--border); opacity: .3; cursor: not-allowed; }
+    .table-card.multi    { border-color: rgba(255,102,20,0.6); background: rgba(255,102,20,0.08); }
+    .table-card.multi::after { background: var(--orange); }
+
+    .table-card-id {
+      font-size: 9px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 2px; color: var(--muted);
+    }
+    .table-card-desc { font-size: 11px; color: var(--muted); }
+    .table-card-status {
+      font-size: 11px; font-weight: 600; margin-top: auto;
+      text-transform: uppercase; letter-spacing: 1.5px;
+    }
+    .table-card.libre    .table-card-status { color: var(--green); }
+    .table-card.reservee .table-card-status { color: var(--orange); }
+    .table-card.multi    .table-card-status { color: var(--orange); }
+    .table-card-name  { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .table-card-time  { font-size: 11px; color: var(--muted); letter-spacing: .5px; }
+    .table-card-cap   { position: absolute; top: 10px; right: 10px; font-size: 10px; color: var(--muted); }
+
+    /* ─── Table shapes ─── */
+    .shape-round {
+      border-radius: 50% !important;
+      width: 108px; height: 108px;
+      min-height: unset !important;
+      flex-shrink: 0;
+      justify-content: center; align-items: center;
+      text-align: center; padding: 10px 6px;
+    }
+    .shape-round .table-card-desc { display: none; }
+    .shape-round .table-card-cap { top: 6px; right: 8px; font-size: 9px; }
+
+    .shape-wide { width: 220px; flex-shrink: 0; }
+
+    /* ─── Bar zone ─── */
+    .zone-bar .zone-tables { padding: 18px 14px; }
+    .zone-bar .table-card {
+      border-radius: 0 0 10px 10px !important;
+      border-top: 2px solid var(--border2);
+      min-width: 130px; flex: 1; max-width: 200px;
+    }
+
+    /* ─── Service filter ─── */
+    .service-filter { display: flex; gap: 6px; padding: 0 14px 14px; }
+    .service-btn {
+      flex: 1; padding: 7px 0;
+      background: transparent; border: 1px solid var(--border2);
+      color: var(--muted); font-size: 9px; font-weight: 700;
+      letter-spacing: 2px; text-transform: uppercase; cursor: pointer;
+      transition: all .15s; font-family: inherit;
+    }
+    .service-btn.active { background: var(--orange); border-color: var(--orange); color: #fff; }
+    .service-btn:hover:not(.active) { border-color: var(--orange); color: var(--orange); }
+
+    /* ─── Empty state ─── */
+    .resa-empty { padding: 44px 20px; text-align: center; color: var(--muted); }
+    .resa-empty-icon { margin-bottom: 14px; display: flex; justify-content: center; opacity: .35; }
+    .resa-empty p { font-size: 10px; text-transform: uppercase; letter-spacing: 2px; line-height: 2; }
+
+    /* ─── Sidebar ─── */
+    #sidebar {
+      width: 330px; flex-shrink: 0; border-left: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+      background: var(--surface);
+    }
+
+    /* Stats */
+    #stats-bar { display: flex; border-bottom: 1px solid var(--border); }
+    .stat-item { flex: 1; padding: 16px 8px; text-align: center; border-right: 1px solid var(--border); }
+    .stat-item:last-child { border-right: none; }
+    .stat-num { font-size: 24px; font-weight: 300; display: block; line-height: 1; }
+    .stat-num.green  { color: var(--green); }
+    .stat-num.amber  { color: var(--orange); }
+    .stat-num.indigo { color: #fff; }
+    .stat-label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; margin-top: 4px; display: block; }
+
+    /* New resa button */
+    #btn-new-resa {
+      margin: 14px; padding: 11px;
+      background: transparent; color: #fff;
+      border: 1px solid #fff;
+      font-weight: 600; font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+      transition: all .2s; display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    #btn-new-resa:hover { background: var(--orange); border-color: var(--orange); }
+
+    /* List header */
+    .resa-list-header {
+      padding: 0 16px 10px;
+      font-size: 9px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 2.5px;
+    }
+
+    /* Resa list */
+    #resa-list { flex: 1; overflow-y: auto; }
+    .resa-item {
+      padding: 12px 16px; border-bottom: 1px solid var(--border);
+      display: flex; gap: 12px; cursor: pointer; transition: background .15s;
+      position: relative;
+    }
+    .resa-item::before {
+      content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+      width: 2px; background: transparent; transition: background .15s;
+    }
+    .resa-item:hover { background: var(--surface2); }
+    .resa-item:hover::before { background: var(--orange); }
+    .resa-time { font-size: 12px; font-weight: 700; color: var(--orange); width: 38px; flex-shrink: 0; letter-spacing: .5px; }
+    .resa-info { flex: 1; min-width: 0; }
+    .resa-name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .3px; }
+    .resa-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .resa-badges { display: flex; gap: 5px; margin-top: 6px; flex-wrap: wrap; }
+    .badge { font-size: 9px; padding: 2px 7px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+    .badge-table { background: transparent; border: 1px solid var(--border2); color: var(--muted); }
+    .badge-confirmed { background: var(--green-dim); color: var(--green); border: 1px solid rgba(76,175,125,0.3); }
+    .badge-cancelled { background: var(--red-dim); color: var(--red); border: 1px solid rgba(224,80,80,0.3); }
+    .badge-persons { background: var(--orange-dim); color: var(--orange); border: 1px solid rgba(255,102,20,0.3); }
+
+
+    /* ══════════════════════════════════════════
+       MODALS
+    ══════════════════════════════════════════ */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.85); backdrop-filter: blur(6px);
+      z-index: 500; align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: var(--surface); border: 1px solid var(--border2);
+      box-shadow: var(--shadow), 0 0 0 1px rgba(255,102,20,0.1);
+      width: 100%; max-width: 520px; max-height: 90vh;
+      overflow-y: auto; animation: slideUp .2s ease;
+      position: relative;
+    }
+    @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 22px; border-bottom: 1px solid var(--border);
+    }
+    .modal-header h3 {
+      font-size: 12px; font-weight: 700; letter-spacing: 3px;
+      text-transform: uppercase; color: var(--text);
+    }
+    .modal-close-btn {
+      background: transparent; border: 1px solid var(--border2);
+      color: var(--muted); width: 28px; height: 28px;
+      font-size: 14px; display: flex; align-items: center; justify-content: center;
+      transition: all .15s;
+    }
+    .modal-close-btn:hover { border-color: var(--orange); color: var(--orange); }
+
+    .modal-body { padding: 22px; overflow-y: auto; }
+    .modal-footer { padding: 16px 22px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+
+    /* Detail rows */
+    .detail-section { margin-bottom: 22px; }
+    .detail-section-title {
+      font-size: 9px; color: var(--orange); text-transform: uppercase;
+      letter-spacing: 2.5px; font-weight: 700; margin-bottom: 12px;
+      padding-bottom: 8px; border-bottom: 1px solid var(--border);
+    }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .detail-item label { font-size: 9px; color: var(--muted); display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1.5px; }
+    .detail-item span { font-size: 13px; font-weight: 500; }
+    .detail-item.full { grid-column: 1/-1; }
+    .notes-box {
+      background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+      padding: 10px 12px; font-size: 12px; color: var(--muted); font-style: italic;
+      border-left: 2px solid var(--orange);
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 10px 20px; font-weight: 600; font-size: 10px;
+      letter-spacing: 2px; text-transform: uppercase;
+      border: 1px solid transparent; transition: all .2s;
+    }
+    .btn:hover { opacity: .88; }
+    .btn-primary { background: var(--orange); color: #fff; border-color: var(--orange); }
+    .btn-danger  { background: transparent; color: var(--red); border-color: var(--red); }
+    .btn-danger:hover { background: var(--red); color: #fff; opacity: 1; }
+    .btn-secondary { background: transparent; color: var(--muted); border-color: var(--border2); }
+    .btn-secondary:hover { color: #fff; border-color: #fff; opacity: 1; }
+    .btn-success { background: transparent; color: var(--green); border-color: var(--green); }
+
+    /* Multi-resa in modal */
+    .resa-slot {
+      background: rgba(255,255,255,0.02); border: 1px solid var(--border);
+      border-left: 2px solid var(--orange);
+      padding: 14px; margin-bottom: 12px;
+    }
+    .resa-slot-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .resa-slot-time { font-size: 16px; font-weight: 300; color: var(--orange); letter-spacing: 1px; }
+    .resa-slot-name { font-size: 13px; font-weight: 600; }
+    .resa-slot-meta { font-size: 11px; color: var(--muted); }
+
+    /* ─── Form ─── */
+    .form-section-title {
+      font-size: 9px; color: var(--orange); text-transform: uppercase;
+      letter-spacing: 2.5px; font-weight: 700; margin: 20px 0 12px;
+      padding-bottom: 8px; border-bottom: 1px solid var(--border);
+    }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-group { display: flex; flex-direction: column; margin-bottom: 14px; }
+    .form-group label {
+      font-size: 9px; color: var(--muted); margin-bottom: 6px;
+      font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      background: rgba(255,255,255,0.03); border: 1px solid var(--border2);
+      color: var(--text); padding: 10px 12px;
+      transition: border-color .2s; outline: none; font-size: 13px;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus { border-color: var(--orange); }
+    .form-group textarea { resize: vertical; min-height: 72px; }
+    .form-group select option { background: #111; }
+
+    /* ══════════════════════════════════════════
+       TOASTS
+    ══════════════════════════════════════════ */
+    #toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 999; display: flex; flex-direction: column; gap: 10px; }
+    .toast {
+      display: flex; align-items: center; gap: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      padding: 14px 18px; box-shadow: var(--shadow);
+      animation: slideIn .25s ease; min-width: 290px; max-width: 360px;
+    }
+    .toast.removing { animation: slideOut .25s ease forwards; }
+    @keyframes slideIn { from { transform: translateX(110%); opacity:0; } to { transform: translateX(0); opacity:1; } }
+    @keyframes slideOut { from { transform: translateX(0); opacity:1; } to { transform: translateX(110%); opacity:0; } }
+    .toast-icon { font-size: 18px; flex-shrink: 0; }
+    .toast-text { flex: 1; }
+    .toast-title { font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; }
+    .toast-msg   { font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .toast.success  { border-left: 2px solid var(--green); }
+    .toast.error    { border-left: 2px solid var(--red); }
+    .toast.info     { border-left: 2px solid var(--muted); }
+    .toast.new-resa { border-left: 2px solid var(--orange); }
+
+    /* ══════════════════════════════════════════
+       LOADING
+    ══════════════════════════════════════════ */
+    .loading-overlay {
+      position: fixed; inset: 0; background: #000;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 999; flex-direction: column; gap: 20px;
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-top-color: var(--orange);
+      border-radius: 50%; animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 3px; }
+
+    /* ══════════════════════════════════════════
+       RESPONSIVE
+    ══════════════════════════════════════════ */
+    @media (max-width: 768px) {
+      #app-main { flex-direction: column; }
+      #sidebar { width: 100%; border-left: none; border-top: 1px solid var(--border); height: 40vh; }
+      #floor-plan { height: 60vh; }
+      .zone-tables { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+      .header-center .date-label { display: none; }
+      .user-badge { display: none; }
+      .form-row { grid-template-columns: 1fr; }
+      .detail-grid { grid-template-columns: 1fr; }
+      #toast-container { bottom: 12px; right: 12px; left: 12px; }
+      .toast { min-width: unset; }
+    }
+    @media (max-width: 480px) {
+      #app-header { padding: 0 14px; }
+      #floor-plan { padding: 10px; }
+    }
+
+    /* ── VIP & Allergènes ── */
+    .badge-vip { background: rgba(255,215,0,0.15); color: #ffd700; border: 1px solid rgba(255,215,0,0.4); }
+    .vip-toggle { background: transparent; border: none; font-size: 16px; cursor: pointer; line-height: 1; padding: 2px; transition: transform .2s; }
+    .vip-toggle:hover { transform: scale(1.3); }
+    .allergen-box {
+      background: rgba(255,102,20,0.08); border: 1px solid rgba(255,102,20,0.3);
+      border-left: 3px solid var(--orange); padding: 8px 12px;
+      font-size: 11px; color: var(--orange); margin-top: 8px; letter-spacing: .5px;
+    }
+    .client-lookup-info {
+      background: rgba(76,175,125,0.08); border: 1px solid rgba(76,175,125,0.2);
+      border-left: 3px solid var(--green); padding: 8px 12px;
+      font-size: 11px; color: var(--green); margin-top: 8px;
+      display: none;
+    }
+
+    /* ── Liste d'attente ── */
+    #waitlist-section {
+      border-top: 1px solid var(--border); padding: 12px 16px;
+      flex-shrink: 0; max-height: 220px; overflow-y: auto;
+    }
+    .waitlist-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .waitlist-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 2.5px; color: var(--muted); }
+    .waitlist-count { background: var(--orange-dim); color: var(--orange); border: 1px solid rgba(255,102,20,0.3); font-size: 10px; font-weight: 700; padding: 2px 8px; }
+    .waitlist-item {
+      padding: 9px 0; border-bottom: 1px solid var(--border);
+      display: flex; align-items: flex-start; gap: 10px;
+    }
+    .waitlist-item:last-child { border-bottom: none; }
+    .waitlist-info { flex: 1; min-width: 0; }
+    .waitlist-name { font-weight: 600; font-size: 12px; }
+    .waitlist-meta { font-size: 10px; color: var(--muted); margin-top: 2px; }
+    .waitlist-notify-btn {
+      background: transparent; border: 1px solid rgba(76,175,125,0.4); color: var(--green);
+      font-size: 10px; padding: 3px 8px; cursor: pointer; flex-shrink: 0;
+      font-weight: 600; letter-spacing: .5px; transition: all .2s;
+    }
+    .waitlist-notify-btn:hover { background: var(--green-dim); }
+    .waitlist-empty { font-size: 11px; color: var(--muted); text-align: center; padding: 10px 0; }
+
+    /* ── Stats tab ── */
+    #view-stats {
+      display: none; flex: 1; overflow: auto; padding: 28px 36px;
+      flex-direction: column;
+    }
+    .stats-kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; margin-bottom: 28px; }
+    .stats-kpi {
+      background: var(--surface2); border: 1px solid var(--border2); padding: 18px 16px;
+      border-left: 3px solid var(--orange);
+    }
+    .stats-kpi-val { font-size: 30px; font-weight: 300; color: var(--orange); line-height: 1.1; }
+    .stats-kpi-label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; margin-top: 6px; }
+    .stats-section-title {
+      font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 3px;
+      color: var(--muted); margin: 24px 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border);
+    }
+    /* Bar chart */
+    .chart-wrap { display: flex; align-items: flex-end; gap: 4px; height: 110px; margin-bottom: 6px; }
+    .chart-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; height: 100%; }
+    .chart-bar { width: 100%; background: var(--orange); min-height: 2px; transition: height .5s ease; border-top: 1px solid rgba(255,102,20,0.7); cursor: default; }
+    .chart-bar:hover { background: #ff8844; }
+    .chart-bar-lbl { font-size: 9px; color: var(--muted); white-space: nowrap; letter-spacing: .3px; }
+    .chart-bar-val { font-size: 9px; color: var(--orange); font-weight: 700; }
+    .chart-labels { display: flex; gap: 4px; }
+    .chart-label-item { flex: 1; text-align: center; font-size: 9px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+    /* Top table */
+    .top-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .top-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    .top-table tr:last-child td { border-bottom: none; }
+    .rank-badge { display: inline-block; width: 22px; height: 22px; border-radius: 50%; background: var(--orange-dim); color: var(--orange); font-size: 10px; font-weight: 700; text-align: center; line-height: 22px; }
+    .stats-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 900px) { .stats-two-col { grid-template-columns: 1fr; } }
+
+    /* ── Edit mode plan de salle ── */
+    .edit-table-btn { display:none; position:absolute; top:5px; left:5px; background:rgba(255,102,20,0.18); border:1px solid rgba(255,102,20,0.5); color:var(--orange); font-size:10px; cursor:pointer; padding:2px 7px; z-index:5; transition:all .2s; }
+    .edit-table-btn:hover { background:var(--orange); color:#fff; }
+    #floor-plan.edit-mode .edit-table-btn { display:block; }
+    #floor-plan.edit-mode .table-card { cursor:default; }
+    #floor-plan.edit-mode .table-card:hover::after { background:var(--orange); }
+    #edit-mode-banner { display:none; background:rgba(255,102,20,0.10); border-bottom:1px solid rgba(255,102,20,0.3); padding:8px 20px; font-size:11px; color:var(--orange); text-align:center; letter-spacing:1px; position:sticky; top:0; z-index:10; }
+
+    /* ── Service capacity bars ── */
+    .cap-bar-wrap { padding:12px 0 4px; border-top:1px solid var(--border); margin-top:12px; }
+    .cap-row { display:flex; align-items:center; gap:8px; margin-bottom:7px; }
+    .cap-lbl { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; width:38px; flex-shrink:0; }
+    .cap-bar-bg { flex:1; height:4px; background:var(--surface3); overflow:hidden; }
+    .cap-bar-fill { height:100%; background:var(--orange); transition:width .5s ease; }
+    .cap-bar-fill.full { background:var(--red); }
+    .cap-pct { font-size:10px; color:var(--muted); width:32px; text-align:right; flex-shrink:0; }
+    .cap-cfg-btn { font-size:10px; background:transparent; border:none; color:var(--muted); cursor:pointer; padding:0; }
+    .cap-cfg-btn:hover { color:var(--orange); }
+
+    /* ── No-show badge ── */
+    .badge-noshow { background: rgba(192,132,252,0.12); color: #c084fc; border: 1px solid rgba(192,132,252,0.3); }
+    .badge-termine { background: rgba(100,200,100,0.10); color: #6dc86d; border: 1px solid rgba(109,200,109,0.3); }
+    .badge-arrive { background: rgba(56,189,248,0.12); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); }
+
+    /* ── Blocages créneaux ── */
+    .blocage-item { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:var(--red-dim); border:1px solid rgba(224,80,80,0.3); margin-bottom:8px; }
+    .blocage-info { font-size:12px; }
+    .blocage-label { font-weight:600; color:var(--red); }
+    .blocage-sub { color:var(--muted); font-size:11px; margin-top:2px; }
+    .btn-del-blocage { background:transparent; border:none; color:var(--red); font-size:16px; cursor:pointer; padding:4px 8px; }
+
+    /* ── Commandes tab ── */
+    #view-commandes {
+      display: none; flex: 1; overflow: auto; padding: 24px 32px;
+      flex-direction: column;
+    }
+    .cmd-board { display: flex; flex-wrap: wrap; gap: 12px; align-content: flex-start; }
+    .cmd-card {
+      background: var(--surface2); border: 1px solid var(--border);
+      width: 260px; flex-shrink: 0; display: flex; flex-direction: column;
+      position: relative; overflow: hidden;
+    }
+    .cmd-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; }
+    .cmd-card.cmd-att::before  { background: var(--orange); }
+    .cmd-card.cmd-prep::before { background: #f5c518; }
+    .cmd-card.cmd-pret::before { background: var(--green); }
+    .cmd-card-header {
+      padding: 10px 12px 8px; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: flex-start;
+    }
+    .cmd-table { font-size: 16px; font-weight: 800; letter-spacing: 2px; }
+    .cmd-meta   { font-size: 10px; color: var(--muted); margin-top: 2px; }
+    .cmd-pill {
+      font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+      padding: 3px 7px; border: 1px solid; flex-shrink: 0;
+    }
+    .cmd-att  .cmd-pill { color: var(--orange); border-color: rgba(255,102,20,.4); background: var(--orange-dim); }
+    .cmd-prep .cmd-pill { color: #f5c518;       border-color: rgba(245,197,24,.4);  background: rgba(245,197,24,.1); }
+    .cmd-pret .cmd-pill { color: var(--green);  border-color: rgba(76,175,125,.4); background: var(--green-dim); }
+    .cmd-items { padding: 8px 12px; flex: 1; }
+    .cmd-item  { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+    .cmd-item:last-child { border-bottom: none; }
+    .cmd-item-qty { color: var(--orange); font-weight: 700; }
+    .cmd-footer { padding: 8px 12px; border-top: 1px solid var(--border); display: flex; gap: 6px; }
+    .cmd-btn {
+      flex: 1; padding: 7px 4px; font-size: 10px; font-weight: 600; letter-spacing: 1px;
+      text-transform: uppercase; border: 1px solid; cursor: pointer; transition: all .15s;
+    }
+    .cmd-btn-prep { background: transparent; border-color: rgba(245,197,24,.4); color: #f5c518; font-family: inherit; }
+    .cmd-btn-prep:hover { background: rgba(245,197,24,.1); }
+    .cmd-btn-pret { background: transparent; border-color: rgba(76,175,125,.4); color: var(--green); font-family: inherit; }
+    .cmd-btn-pret:hover { background: var(--green-dim); }
+    .cmd-btn-arch { background: transparent; border-color: var(--border); color: var(--muted); font-family: inherit; }
+    .cmd-btn-arch:hover { border-color: var(--red); color: var(--red); }
+    #cmd-notif {
+      position: fixed; bottom: 28px; right: 28px; z-index: 9999;
+      background: #1a1a1a; border: 1px solid rgba(255,102,20,.5);
+      border-left: 3px solid var(--orange);
+      padding: 14px 44px 14px 16px; min-width: 280px; display: none;
+      animation: slideInRight .35s ease;
+    }
+    .cmd-notif-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--orange); margin-bottom: 5px; }
+    .cmd-notif-body  { font-size: 13px; color: var(--text); }
+    .cmd-notif-sub   { font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .cmd-notif-close { position: absolute; top: 8px; right: 10px; background: none; border: none; color: var(--muted); font-size: 15px; cursor: pointer; }
+    #tab-commandes-wrap { position: relative; display: inline-block; }
+    #cmd-count-badge {
+      position: absolute; top: -5px; right: -7px;
+      background: var(--orange); color: #fff; border-radius: 50%;
+      width: 17px; height: 17px; font-size: 10px; font-weight: 700;
+      display: none; align-items: center; justify-content: center; line-height: 1;
+    }
+
+    /* ── Annulations tab ── */
+    #view-annulations {
+      display: none; flex: 1; overflow: auto; padding: 28px 36px;
+      flex-direction: column;
+    }
+    .annul-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .annul-table th { padding:10px 12px; text-align:left; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1.5px; color:var(--muted); border-bottom:1px solid var(--border2); }
+    .annul-table td { padding:12px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
+    .annul-table tr:last-child td { border-bottom:none; }
+    .annul-table tr:hover td { background:var(--surface2); }
+    .annul-badge-id { background:var(--red-dim); color:var(--red); border:1px solid rgba(224,80,80,0.3); padding:3px 8px; font-size:11px; font-weight:700; letter-spacing:.5px; display:inline-block; }
+
+    /* ── Annulations notification toast ── */
+    #annul-notif {
+      position:fixed; bottom:28px; right:28px; z-index:9999;
+      background:#1a1a1a; border:1px solid rgba(224,80,80,0.5);
+      border-left:3px solid var(--red);
+      padding:16px 20px 16px 18px; min-width:300px; max-width:380px;
+      box-shadow:0 8px 40px rgba(0,0,0,0.7);
+      display:none; cursor:pointer;
+      animation: slideInRight .35s ease;
+    }
+    @keyframes slideInRight { from{transform:translateX(110%);opacity:0} to{transform:translateX(0);opacity:1} }
+    .annul-notif-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:2px; color:var(--red); margin-bottom:6px; }
+    .annul-notif-body  { font-size:13px; color:var(--text); }
+    .annul-notif-sub   { font-size:11px; color:var(--muted); margin-top:4px; }
+    .annul-notif-close { position:absolute; top:8px; right:10px; background:none; border:none; color:var(--muted); font-size:15px; cursor:pointer; }
+    #tab-annulations-wrap { position:relative; display:inline-block; }
+    #annul-count-badge {
+      position:absolute; top:-5px; right:-7px;
+      background:var(--red); color:#fff; border-radius:50%;
+      width:17px; height:17px; font-size:10px; font-weight:700;
+      display:none; align-items:center; justify-content:center; line-height:1;
+    }
+
+    /* ── Print ── */
+    #print-header { display:none; padding:0 0 16px; border-bottom:2px solid #222; margin-bottom:16px; }
+    #print-header .ph-title { font-size:20px; font-weight:700; letter-spacing:2px; }
+    #print-header .ph-date { font-size:14px; color:#666; margin-top:4px; }
+    #print-header .ph-meta { font-size:12px; color:#888; margin-top:6px; }
+    @media print {
+      #screen-login,#app-header,#floor-plan,.service-filter,
+      #btn-new-resa,#btn-toggle-cancelled,#btn-clear-cancelled,
+      #waitlist-section,.modal-overlay,#toast-container,
+      #loading-overlay,#bg-logo,#view-clients,#view-stats,#view-commandes,#view-annulations,#annul-notif,#cmd-notif,
+      .resa-actions,#print-btn-group { display:none !important; }
+      body,html { background:#fff !important; color:#000 !important; }
+      #screen-dashboard { display:block !important; background:#fff !important; }
+      #app-main { display:block !important; }
+      #sidebar { width:100% !important; position:static !important; padding:0 !important; overflow:visible !important; max-height:none !important; border:none !important; background:#fff !important; }
+      #print-header { display:block !important; }
+      #stats-bar { background:#fff !important; border:none !important; }
+      .stat-num { color:#000 !important; }
+      .stat-label { color:#666 !important; }
+      .resa-list-header { color:#000 !important; border-bottom:1px solid #ccc !important; }
+      .resa-item { border:1px solid #ccc !important; margin-bottom:6px !important; background:#fff !important; break-inside:avoid; page-break-inside:avoid; }
+      .resa-time,.resa-name,.resa-meta { color:#000 !important; }
+      .badge { border:1px solid #ccc !important; background:#fff !important; color:#000 !important; }
+      .resa-notes { color:#555 !important; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     LOGIN
+══════════════════════════════════════════ -->
+<div id="screen-login">
+  <div class="login-card">
+    <div class="login-logo"><img src="logo-bazar.avif" alt="Le Bazar" /></div>
+    <div class="login-sub">Gestion des réservations</div>
+    <form id="login-form">
+      <label for="login-email">Email</label>
+      <input id="login-email" type="email" placeholder="staff@lebazar.fr" required autocomplete="email" />
+      <label for="login-password">Mot de passe</label>
+      <input id="login-password" type="password" placeholder="••••••••" required autocomplete="current-password" />
+      <button type="submit">Se connecter →</button>
+      <div id="login-error"></div>
+    </form>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     DASHBOARD
+══════════════════════════════════════════ -->
+<div id="screen-dashboard" style="display:none">
+
+  <!-- Logo watermark background -->
+  <img id="bg-logo" src="logo-bazar.avif" alt="" aria-hidden="true" />
+
+  <!-- Header -->
+  <header id="app-header">
+    <div class="header-left">
+      <span class="app-logo"><img src="logo-bazar.avif" alt="Le Bazar" /></span>
+      <div class="live-dot" id="live-dot" title="Connexion temps réel"></div>
+    </div>
+    <div class="header-center">
+      <button class="nav-day-btn" id="btn-prev-day">‹</button>
+      <input type="date" id="date-picker" />
+      <span class="date-label" id="date-label"></span>
+      <button class="nav-day-btn" id="btn-next-day">›</button>
+      <button id="btn-all-dates" onclick="toggleAllDates()" title="Voir toutes les réservations" style="padding:5px 10px;background:transparent;border:1px solid var(--border2);color:var(--muted);cursor:pointer;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-left:6px;transition:all .2s;">TOUT</button>
+    </div>
+    <div class="header-right">
+      <div style="display:flex;gap:4px;margin-right:12px;">
+        <button id="tab-reservations" onclick="switchTab('reservations')" style="padding:7px 14px;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;border:1px solid var(--orange);background:var(--orange);color:#fff;cursor:pointer;">📅 Réservations</button>
+        <button id="tab-clients" onclick="switchTab('clients')" style="padding:7px 14px;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;">👤 Clients</button>
+        <button id="tab-stats" onclick="switchTab('stats')" style="padding:7px 14px;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;">📊 Stats</button>
+        <span id="tab-commandes-wrap"><button id="tab-commandes" onclick="switchTab('commandes')" style="padding:7px 14px;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;">🍽️ Commandes</button><span id="cmd-count-badge" style="display:none;position:absolute;top:-5px;right:-7px;background:var(--orange);color:#fff;border-radius:50%;width:17px;height:17px;font-size:10px;font-weight:700;align-items:center;justify-content:center;line-height:1;"></span></span>
+        <span id="tab-annulations-wrap"><button id="tab-annulations" onclick="switchTab('annulations')" style="padding:7px 14px;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;">❌ Annulations</button><span id="annul-count-badge" style="position:absolute;top:-5px;right:-7px;background:var(--red);color:#fff;border-radius:50%;width:17px;height:17px;font-size:10px;font-weight:700;display:none;align-items:center;justify-content:center;line-height:1;"></span></span>
+      </div>
+      <button onclick="toggleEditMode()" title="Modifier le plan de salle" id="btn-edit-plan" style="padding:7px 10px;background:transparent;border:1px solid var(--border2);color:var(--muted);cursor:pointer;font-size:13px;" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="if(!window.editModeOn){this.style.borderColor='var(--border2)';this.style.color='var(--muted)'}">⚙️ Plan</button>
+      <button onclick="showQRCode()" title="QR Code formulaire public" style="padding:7px 10px;background:transparent;border:1px solid var(--border2);color:var(--muted);cursor:pointer;font-size:13px;" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">📱 QR</button>
+      <button onclick="openBlocagesModal()" title="Blocage de créneaux" style="padding:7px 10px;background:transparent;border:1px solid var(--border2);color:var(--muted);cursor:pointer;font-size:13px;" onmouseover="this.style.borderColor='var(--red)';this.style.color='var(--red)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">🚫 Blocages</button>
+      <span class="user-badge" id="user-badge"></span>
+      <button id="btn-logout">Déconnexion</button>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <div id="app-main">
+
+    <!-- Floor Plan -->
+    <section id="floor-plan">
+      <div id="edit-mode-banner">⚙️ MODE ÉDITION — Cliquez sur ✏️ pour modifier une table &nbsp;<button onclick="toggleEditMode()" style="background:var(--orange);border:none;color:#fff;padding:3px 12px;font-size:10px;cursor:pointer;letter-spacing:1px;">TERMINER</button></div>
+      <!-- Rendered by JS -->
+    </section>
+
+    <!-- Sidebar -->
+    <aside id="sidebar">
+      <div id="stats-bar">
+        <div class="stat-item">
+          <span class="stat-num amber" id="stat-resas">0</span>
+          <span class="stat-label">Réservations</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-num indigo" id="stat-couverts">0</span>
+          <span class="stat-label">Couverts</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-num green" id="stat-libres">0</span>
+          <span class="stat-label">Tables libres</span>
+        </div>
+      </div>
+      <!-- Capacity bars midi/soir -->
+      <div class="cap-bar-wrap" id="cap-bar-section">
+        <div class="cap-row">
+          <span class="cap-lbl">Midi</span>
+          <div class="cap-bar-bg"><div class="cap-bar-fill" id="cap-bar-midi" style="width:0%"></div></div>
+          <span class="cap-pct" id="cap-pct-midi">0%</span>
+        </div>
+        <div class="cap-row">
+          <span class="cap-lbl">Soir</span>
+          <div class="cap-bar-bg"><div class="cap-bar-fill" id="cap-bar-soir" style="width:0%"></div></div>
+          <span class="cap-pct" id="cap-pct-soir">0%</span>
+          <button class="cap-cfg-btn" onclick="openCapacityConfig()" title="Configurer la capacité">⚙️</button>
+        </div>
+      </div>
+      <!-- Print header (visible uniquement à l'impression) -->
+      <div id="print-header">
+        <div class="ph-title">LE BAZAR — FICHE DE SERVICE</div>
+        <div class="ph-date" id="ph-date"></div>
+        <div class="ph-meta" id="ph-meta"></div>
+      </div>
+
+      <div id="print-btn-group" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button id="btn-new-resa">＋ Nouvelle réservation</button>
+        <button onclick="printService()" title="Imprimer la fiche de service" style="padding:9px 10px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-size:12px;cursor:pointer;" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">🖨️</button>
+        <button onclick="exportCSV('reservations')" title="Exporter les réservations CSV" style="padding:9px 10px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-size:12px;cursor:pointer;" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">⬇️ CSV</button>
+        <button id="btn-toggle-cancelled" style="padding:9px 12px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-size:11px;font-weight:600;letter-spacing:1px;cursor:pointer;transition:all .2s;display:none;" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="if(!window.showCancelled){this.style.borderColor='var(--border2)';this.style.color='var(--muted)'}">👁 Annulées</button>
+        <button id="btn-clear-cancelled" title="Supprimer toutes les réservations annulées" style="padding:9px 12px;background:transparent;border:1px solid rgba(224,80,80,0.4);color:var(--red);font-size:11px;font-weight:600;letter-spacing:1px;cursor:pointer;transition:all .2s;display:none;" onmouseover="this.style.background='var(--red-dim)'" onmouseout="this.style.background='transparent'">🗑️ Vider</button>
+      </div>
+      <div class="service-filter">
+        <button class="service-btn active" data-service="all">Tous</button>
+        <button class="service-btn" data-service="midi">Midi</button>
+        <button class="service-btn" data-service="soir">Soir</button>
+      </div>
+      <div class="resa-list-header">Réservations du jour</div>
+      <div id="resa-list"></div>
+
+      <!-- Liste d'attente -->
+      <div id="waitlist-section" style="display:none">
+        <div class="waitlist-header">
+          <span class="waitlist-title">⏳ Liste d'attente</span>
+          <span class="waitlist-count" id="waitlist-count">0</span>
+        </div>
+        <div id="waitlist-list"></div>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- ══ VUE STATS ══ -->
+  <div id="view-stats">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+      <div style="font-size:18px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">📊 Statistiques</div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:13px;">
+        <span style="color:var(--muted)">Ticket moyen :</span>
+        <input type="number" id="ticket-moyen" min="0" step="5" value="35"
+          style="width:72px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:6px 10px;font-size:13px;font-family:inherit;outline:none;text-align:right;"
+          onfocus="this.style.borderColor='var(--orange)'" onblur="this.style.borderColor='var(--border2)'"
+          oninput="localStorage.setItem('bazar-ticket-moyen',this.value);renderStats(window._lastStatsResas||[],window._lastStatsClients||[])" />
+        <span style="color:var(--muted)">€ / couvert</span>
+        <button onclick="exportCSV('clients')" style="padding:7px 12px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-size:12px;cursor:pointer;margin-left:8px;" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">⬇️ Export clients</button>
+      </div>
+    </div>
+    <div class="stats-kpi-grid" id="stats-kpis"></div>
+    <div class="stats-section-title">Couverts par jour — 14 derniers jours</div>
+    <div id="stats-chart-wrap"></div>
+    <div class="stats-two-col" style="margin-top:4px">
+      <div>
+        <div class="stats-section-title">🏆 Clients les plus fidèles</div>
+        <table class="top-table" id="stats-top-clients"><tbody></tbody></table>
+      </div>
+      <div>
+        <div class="stats-section-title">📅 Jours les plus chargés</div>
+        <table class="top-table" id="stats-top-days"><tbody></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ VUE CLIENTS ══ -->
+  <div id="view-clients" style="display:none;flex:1;overflow:auto;padding:24px 32px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div>
+        <div style="font-size:18px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">👤 Base clients</div>
+        <div style="color:var(--muted);font-size:12px;margin-top:4px;" id="clients-count">Chargement…</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button onclick="exportCSV('clients')" style="padding:8px 14px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-size:12px;cursor:pointer;white-space:nowrap;" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">⬇️ Export CSV</button>
+        <input id="clients-search" type="text" placeholder="Rechercher nom, téléphone, email…"
+        style="padding:9px 14px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);width:280px;font-size:13px;outline:none;"
+        oninput="filterClients(this.value)" onfocus="this.style.borderColor='var(--orange)'" onblur="this.style.borderColor='var(--border2)'" />
+      </div>
+    </div>
+    <table id="clients-table" style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border2);color:var(--muted);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;">
+          <th style="padding:10px 8px;text-align:center;font-weight:600;">VIP</th>
+          <th style="padding:10px 12px;text-align:left;font-weight:600;">Client</th>
+          <th style="padding:10px 12px;text-align:left;font-weight:600;">Téléphone</th>
+          <th style="padding:10px 12px;text-align:left;font-weight:600;">Email</th>
+          <th style="padding:10px 12px;text-align:left;font-weight:600;">Allergènes</th>
+          <th style="padding:10px 8px;text-align:center;font-weight:600;">Réservations</th>
+          <th style="padding:10px 12px;text-align:left;font-weight:600;">Dernière visite</th>
+          <th style="padding:10px 12px;text-align:left;font-weight:600;">Notes</th>
+          <th style="padding:10px 12px;text-align:left;font-weight:600;">Historique</th>
+        </tr>
+      </thead>
+      <tbody id="clients-tbody"></tbody>
+    </table>
+    <div id="clients-empty" style="display:none;text-align:center;padding:60px 0;color:var(--muted);">
+      <div style="font-size:36px;margin-bottom:12px">👤</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text)">Aucun client trouvé</div>
+      <div style="margin-top:6px;font-size:13px">Les clients s'ajoutent automatiquement à chaque réservation.</div>
+    </div>
+  </div>
+
+  <!-- ══ VUE COMMANDES ══ -->
+  <div id="view-commandes">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+      <div>
+        <div style="font-size:18px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">🍽️ Commandes en cours</div>
+        <div style="color:var(--muted);font-size:12px;margin-top:4px;" id="cmd-count-label">Chargement…</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <button id="cmd-filter-all"  onclick="setCmdFilter('all')"             style="padding:6px 12px;background:var(--orange);border:1px solid var(--orange);color:#fff;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">Tout</button>
+        <button id="cmd-filter-att"  onclick="setCmdFilter('En attente')"      style="padding:6px 12px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">En attente</button>
+        <button id="cmd-filter-prep" onclick="setCmdFilter('En préparation')"  style="padding:6px 12px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">En prép.</button>
+        <button id="cmd-filter-pret" onclick="setCmdFilter('Prêt')"            style="padding:6px 12px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">Prêt</button>
+        <button onclick="loadCommandes()" style="padding:6px 12px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-size:12px;cursor:pointer;" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">🔄 Actualiser</button>
+      </div>
+    </div>
+    <div class="cmd-board" id="cmd-board">
+      <div style="color:var(--muted);font-size:13px;padding:40px 0;">Chargement…</div>
+    </div>
+  </div>
+
+  <!-- NOTIFICATION COMMANDE -->
+  <div id="cmd-notif">
+    <button class="cmd-notif-close" onclick="closeCmdNotif()">✕</button>
+    <div class="cmd-notif-title">🍽️ Nouvelle commande</div>
+    <div class="cmd-notif-body" id="cmd-notif-body">—</div>
+    <div class="cmd-notif-sub"  id="cmd-notif-sub">—</div>
+  </div>
+
+  <!-- ══ VUE ANNULATIONS ══ -->
+  <div id="view-annulations">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+      <div>
+        <div style="font-size:18px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">❌ Réservations annulées</div>
+        <div style="color:var(--muted);font-size:12px;margin-top:4px;" id="annul-count-label">Chargement…</div>
+      </div>
+      <button onclick="loadAnnulations()" style="padding:8px 14px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-size:12px;cursor:pointer;" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">🔄 Actualiser</button>
+    </div>
+    <table class="annul-table">
+      <thead>
+        <tr>
+          <th>Référence</th>
+          <th>Client</th>
+          <th>Téléphone</th>
+          <th>Date</th>
+          <th>Heure</th>
+          <th>Pers.</th>
+          <th>Table</th>
+          <th>Annulée le</th>
+        </tr>
+      </thead>
+      <tbody id="annul-tbody"></tbody>
+    </table>
+    <div id="annul-empty" style="display:none;text-align:center;padding:60px 0;color:var(--muted);">
+      <div style="font-size:36px;margin-bottom:12px">✅</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text)">Aucune annulation</div>
+      <div style="margin-top:6px;font-size:13px">Les annulations apparaissent ici dès réception.</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ NOTIFICATION ANNULATION ══ -->
+<div id="annul-notif">
+  <button class="annul-notif-close" onclick="closeAnnulNotif()">✕</button>
+  <div class="annul-notif-title">❌ Nouvelle annulation</div>
+  <div class="annul-notif-body" id="annul-notif-body">—</div>
+  <div class="annul-notif-sub" id="annul-notif-sub">—</div>
+</div>
+
+<!-- ══ MODAL — Notes client ══ -->
+<div class="modal-overlay" id="modal-client-notes">
+  <div class="modal-box" style="max-width:460px;">
+    <div class="modal-header">
+      <h3 id="modal-client-name">Notes client</h3>
+      <button class="modal-close-btn" data-close="modal-client-notes">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:9px;color:var(--orange);text-transform:uppercase;letter-spacing:2px;font-weight:700;margin-bottom:8px;">⚠️ Allergènes / Intolérances</div>
+      <input id="client-allergenes-input" type="text" placeholder="Ex: gluten, lactose, fruits de mer…"
+        style="width:100%;background:var(--surface2);border:1px solid rgba(255,102,20,0.4);color:var(--text);padding:10px 12px;font-size:13px;outline:none;font-family:inherit;margin-bottom:14px;"
+        onfocus="this.style.borderColor='var(--orange)'" onblur="this.style.borderColor='rgba(255,102,20,0.4)'" />
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:2px;font-weight:700;margin-bottom:8px;">📝 Notes internes</div>
+      <textarea id="client-notes-input" placeholder="Préférences, occasions spéciales, habitudes…"
+        style="width:100%;min-height:100px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:12px;font-size:13px;resize:vertical;outline:none;font-family:inherit;"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close="modal-client-notes">Annuler</button>
+      <button class="btn btn-primary" id="btn-save-client-notes">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     MODAL — Détail table
+══════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-table">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="modal-table-title">Table</h3>
+      <button class="modal-close-btn" data-close="modal-table">✕</button>
+    </div>
+    <div class="modal-body" id="modal-table-body"></div>
+    <div class="modal-footer" id="modal-table-footer"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     MODAL — Nouvelle réservation
+══════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-new-resa">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Nouvelle réservation</h3>
+      <button class="modal-close-btn" data-close="modal-new-resa">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="new-resa-form" autocomplete="off">
+        <input type="hidden" name="edit_id" id="edit-id-field" value="" />
+        <div class="form-section-title">👤 Client</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nom *</label>
+            <input name="nom_client" type="text" placeholder="Dupont" required />
+          </div>
+          <div class="form-group">
+            <label>Téléphone *</label>
+            <div style="position:relative;">
+              <input name="telephone" id="resa-telephone" type="tel" placeholder="06 12 34 56 78" required autocomplete="off" style="width:100%" />
+              <div id="client-lookup-badge" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:700;letter-spacing:1px;padding:3px 8px;border-radius:2px;"></div>
+            </div>
+          </div>
+        </div>
+        <div id="client-lookup-info" class="client-lookup-info"></div>
+        <div id="client-allergen-warning" class="allergen-box" style="display:none"></div>
+        <div class="form-group">
+          <label>Email</label>
+          <input name="email" type="email" placeholder="dupont@mail.fr" />
+        </div>
+
+        <div class="form-section-title">📅 Réservation</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date *</label>
+            <input name="date_reservation" type="date" required />
+          </div>
+          <div class="form-group">
+            <label>Heure *</label>
+            <input name="heure" type="time" required />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Personnes *</label>
+            <input name="nombre_personnes" type="number" min="1" max="30" placeholder="2" required />
+          </div>
+          <div class="form-group">
+            <label>Table</label>
+            <select name="table_assignee" id="new-resa-table-select">
+              <option value="">Automatique</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea name="notes" placeholder="Allergies, demandes spéciales…"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Occasion spéciale</label>
+          <select name="occasion" id="resa-occasion-select" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:10px 12px;font-size:13px;font-family:inherit;outline:none;">
+            <option value="">— Aucune —</option>
+            <option value="🎂 Anniversaire">🎂 Anniversaire</option>
+            <option value="💍 Fiançailles">💍 Fiançailles</option>
+            <option value="🎉 EVJF / EVG">🎉 EVJF / EVG</option>
+            <option value="💼 Repas d'affaires">💼 Repas d'affaires</option>
+            <option value="🍾 Autre occasion">🍾 Autre occasion</option>
+          </select>
+        </div>
+        <div class="form-group" id="resa-statut-group" style="display:none">
+          <label>Statut</label>
+          <select name="statut" id="resa-statut-select" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:10px 12px;font-size:13px;font-family:inherit;outline:none;">
+            <option value="Confirmée">✅ Confirmée</option>
+            <option value="Arrivé">🟦 Arrivé</option>
+            <option value="Terminée">✔️ Terminée</option>
+            <option value="No-show">👻 No-show</option>
+            <option value="Annulée">❌ Annulée</option>
+          </select>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close="modal-new-resa">Annuler</button>
+      <button class="btn btn-primary" id="btn-submit-resa">Créer la réservation</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL — Ajouter à la liste d'attente ══ -->
+<div class="modal-overlay" id="modal-waitlist">
+  <div class="modal-box" style="max-width:460px;">
+    <div class="modal-header">
+      <h3>⏳ Ajouter à la liste d'attente</h3>
+      <button class="modal-close-btn" data-close="modal-waitlist">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--orange-dim);border:1px solid rgba(255,102,20,0.3);padding:12px 14px;margin-bottom:16px;font-size:12px;color:var(--orange);">
+        Aucune table disponible pour ce créneau. Le client sera notifié dès qu'une place se libère.
+      </div>
+      <form id="waitlist-form">
+        <input type="hidden" id="wl-nom" /><input type="hidden" id="wl-tel" />
+        <input type="hidden" id="wl-email" /><input type="hidden" id="wl-date" />
+        <input type="hidden" id="wl-heure" /><input type="hidden" id="wl-nb" />
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea id="wl-notes" placeholder="Occasion spéciale, préférences…" style="width:100%;min-height:72px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:10px;font-size:13px;resize:vertical;outline:none;font-family:inherit;"></textarea>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close="modal-waitlist">Annuler</button>
+      <button class="btn btn-primary" id="btn-confirm-waitlist">Confirmer l'inscription</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL — Historique client ══ -->
+<div class="modal-overlay" id="modal-client-history">
+  <div class="modal-box" style="max-width:580px;">
+    <div class="modal-header">
+      <h3 id="modal-history-title">📋 Historique des réservations</h3>
+      <button class="modal-close-btn" data-close="modal-client-history">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="client-history-list" style="max-height:400px;overflow-y:auto;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL — Édition table ══ -->
+<div class="modal-overlay" id="modal-edit-table">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-header">
+      <h3 id="modal-edit-table-title">⚙️ Modifier la table</h3>
+      <button class="modal-close-btn" data-close="modal-edit-table">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="et-id" />
+      <input type="hidden" id="et-mode" value="edit" />
+      <div class="form-row">
+        <div class="form-group">
+          <label>ID Table</label>
+          <input id="et-id-display" type="text" placeholder="Ex: T12, EXT-3…" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:10px;width:100%;font-family:inherit;font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--orange)'" onblur="this.style.borderColor='var(--border2)'" />
+        </div>
+        <div class="form-group">
+          <label>Capacité (personnes) *</label>
+          <input id="et-capacite" type="number" min="1" max="20" placeholder="4" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:10px;font-family:inherit;font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--orange)'" onblur="this.style.borderColor='var(--border2)'" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <input id="et-description" type="text" placeholder="Ex: Table salle principale, Vue terrasse…" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:10px;font-family:inherit;font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--orange)'" onblur="this.style.borderColor='var(--border2)'" />
+      </div>
+      <div class="form-group">
+        <label>Zone</label>
+        <select id="et-zone" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:10px;font-family:inherit;font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--orange)'" onblur="this.style.borderColor='var(--border2)'">
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Statut</label>
+        <select id="et-active" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:10px;font-family:inherit;font-size:13px;outline:none;">
+          <option value="true">✅ Active</option>
+          <option value="false">❌ Fermée / Inactive</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between;">
+      <button class="btn btn-danger" id="btn-delete-table" onclick="deleteTable()" style="margin-right:auto;">🗑️ Supprimer</button>
+      <button class="btn btn-secondary" data-close="modal-edit-table">Annuler</button>
+      <button class="btn btn-primary" onclick="saveEditTable()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL — Capacité de service ══ -->
+<div class="modal-overlay" id="modal-capacity">
+  <div class="modal-box" style="max-width:380px;">
+    <div class="modal-header">
+      <h3>⚙️ Capacité de service</h3>
+      <button class="modal-close-btn" data-close="modal-capacity">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Définissez le nombre maximum de couverts acceptés par service.</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>🌞 Max Midi (couverts)</label>
+          <input id="cap-midi-max" type="number" min="1" max="500" placeholder="40" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:10px;font-family:inherit;font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--orange)'" onblur="this.style.borderColor='var(--border2)'" />
+        </div>
+        <div class="form-group">
+          <label>🌙 Max Soir (couverts)</label>
+          <input id="cap-soir-max" type="number" min="1" max="500" placeholder="40" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:10px;font-family:inherit;font-size:13px;outline:none;" onfocus="this.style.borderColor='var(--orange)'" onblur="this.style.borderColor='var(--border2)'" />
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close="modal-capacity">Annuler</button>
+      <button class="btn btn-primary" onclick="saveCapacityConfig()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL — QR Code formulaire ══ -->
+<div class="modal-overlay" id="modal-qr">
+  <div class="modal-box" style="max-width:380px;text-align:center;">
+    <div class="modal-header">
+      <h3>📱 Formulaire de réservation</h3>
+      <button class="modal-close-btn" data-close="modal-qr">✕</button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;align-items:center;gap:16px;">
+      <div style="font-size:12px;color:var(--muted)">Scannez ce QR code pour accéder au formulaire public</div>
+      <canvas id="qr-canvas" style="border:8px solid #fff;border-radius:4px;"></canvas>
+      <div id="qr-url" style="font-size:11px;color:var(--muted);word-break:break-all;"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+        <input id="qr-url-input" type="text" placeholder="URL du formulaire public…" value=""
+          style="width:260px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:8px 10px;font-size:12px;outline:none;font-family:inherit;"
+          onfocus="this.style.borderColor='var(--orange)'" onblur="this.style.borderColor='var(--border2)'"
+          oninput="generateQR(this.value)" />
+      </div>
+      <button onclick="downloadQR()" style="padding:8px 20px;background:var(--orange);border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer;letter-spacing:1px;">⬇️ Télécharger</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL — Blocage créneaux ══ -->
+<div class="modal-overlay" id="modal-blocages">
+  <div class="modal-box" style="max-width:500px;">
+    <div class="modal-header">
+      <h3>🚫 Blocage de créneaux</h3>
+      <button class="modal-close-btn" data-close="modal-blocages">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Bloquez des dates ou créneaux (fermeture, privatisation…). Les réservations seront refusées pendant ces périodes.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+        <div>
+          <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;">Date début *</label>
+          <input type="date" id="bl-date-debut" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:8px 10px;font-size:13px;font-family:inherit;outline:none;" onfocus="this.style.borderColor='var(--orange)'" onblur="this.style.borderColor='var(--border2)'" />
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;">Date fin *</label>
+          <input type="date" id="bl-date-fin" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:8px 10px;font-size:13px;font-family:inherit;outline:none;" onfocus="this.style.borderColor='var(--orange)'" onblur="this.style.borderColor='var(--border2)'" />
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;">Heure début (optionnel)</label>
+          <input type="time" id="bl-heure-debut" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:8px 10px;font-size:13px;font-family:inherit;outline:none;" onfocus="this.style.borderColor='var(--orange)'" onblur="this.style.borderColor='var(--border2)'" />
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;">Heure fin (optionnel)</label>
+          <input type="time" id="bl-heure-fin" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:8px 10px;font-size:13px;font-family:inherit;outline:none;" onfocus="this.style.borderColor='var(--orange)'" onblur="this.style.borderColor='var(--border2)'" />
+        </div>
+      </div>
+      <div style="margin-bottom:16px;">
+        <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;">Motif</label>
+        <input type="text" id="bl-motif" placeholder="Fermeture exceptionnelle, privatisation…" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:8px 10px;font-size:13px;font-family:inherit;outline:none;" onfocus="this.style.borderColor='var(--orange)'" onblur="this.style.borderColor='var(--border2)'" />
+      </div>
+      <button onclick="saveBlocage()" style="padding:9px 20px;background:var(--red);border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer;letter-spacing:1px;width:100%;margin-bottom:20px;">➕ Ajouter le blocage</button>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:2px;font-weight:700;margin-bottom:10px;">Blocages actifs</div>
+      <div id="blocages-list"><div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0;">Aucun blocage</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div id="toast-container"></div>
+
+<!-- Loading -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text">Chargement…</div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCRIPT
+══════════════════════════════════════════ -->
+<script>
+// ═══════════════════════════════════════════
+// ⚙️ CONFIG — À personnaliser
+// ═══════════════════════════════════════════
+const SUPABASE_URL      = 'https://gtjvsrhblqwwnviledmo.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd0anZzcmhibHF3d252aWxlZG1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNjk2NTYsImV4cCI6MjA4OTc0NTY1Nn0.Om-tFf8iIGsTXjWY4l95ApAF6hRP-s5ddsMco_0TPyM';
+
+// Plan du restaurant — assignez les IDs de table à chaque zone
+const ZONES = {
+  '🍽️ Salle':    ['T1', 'T2', 'T3', 'T4'],
+  '🌿 Terrasse':  ['T5', 'T6'],
+  '🍸 Bar':       ['T7'],
+};
+
+// Webhook N8N pour les nouvelles réservations (envoie les emails automatiquement)
+const N8N_WEBHOOK_URL = 'https://supportcn.app.n8n.cloud/webhook/reservation';
+const USE_N8N_WEBHOOK = true; // true = passe par N8N (emails inclus) | false = direct Supabase
+
+// ═══════════════════════════════════════════
+// 🚀 INIT
+// ═══════════════════════════════════════════
+const { createClient } = supabase;
+let db;
+let currentUser = null;
+let allTables = [];
+let allReservations = [];
+let selectedDate = todayISO();
+let realtimeChannel = null;
+let currentService = 'all';
+
+function todayISO() {
+  return new Date().toISOString().split('T')[0];
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
+  db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  setupUIListeners();
+
+  const { data: { session } } = await db.auth.getSession();
+  if (session) {
+    currentUser = session.user;
+    await initDashboard();
+  } else {
+    showScreen('login');
+  }
+
+  db.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && !currentUser) {
+      currentUser = session.user;
+      await initDashboard();
+    }
+    if (event === 'SIGNED_OUT') {
+      currentUser = null;
+      cleanupRealtime();
+      showScreen('login');
+    }
+  });
+});
+
+// ═══════════════════════════════════════════
+// 🔐 AUTH
+// ═══════════════════════════════════════════
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('login-email').value.trim();
+  const pwd   = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  const btn = e.target.querySelector('button[type=submit]');
+  btn.textContent = 'Connexion…'; btn.disabled = true;
+
+  const { error } = await db.auth.signInWithPassword({ email, password: pwd });
+  btn.textContent = 'Se connecter →'; btn.disabled = false;
+  if (error) errEl.textContent = 'Identifiants incorrects.';
+});
+
+document.getElementById('btn-logout').addEventListener('click', async () => {
+  await db.auth.signOut();
+});
+
+// ═══════════════════════════════════════════
+// 🏠 DASHBOARD INIT
+// ═══════════════════════════════════════════
+async function initDashboard() {
+  showScreen('dashboard');
+  document.getElementById('user-badge').textContent = currentUser.email;
+
+  // Set date picker
+  const dp = document.getElementById('date-picker');
+  dp.value = selectedDate;
+  updateDateLabel();
+
+  // Load data
+  await Promise.all([loadTables(), loadReservations(selectedDate), loadWaitlist()]);
+  renderAll();
+  subscribeRealtime();
+  hideLoading();
+  startAnnulPolling();
+  startCmdPolling();
+}
+
+async function loadTables() {
+  const { data, error } = await db.from('tables').select('*').order('id');
+  if (error) { console.error('loadTables:', error); return; }
+  allTables = data || [];
+  // Populate table select in new-resa form
+  const sel = document.getElementById('new-resa-table-select');
+  sel.innerHTML = '<option value="">Automatique</option>';
+  allTables.filter(t => t.active !== false).forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = `${t.id} — ${t.description || ''} (${t.capacite}p)`;
+    sel.appendChild(opt);
+  });
+}
+
+window.allDatesMode = false;
+
+async function loadReservations(date) {
+  let query = db.from('reservations').select('*').order('date_reservation').order('heure');
+  if (!window.allDatesMode) query = query.eq('date_reservation', date);
+  const { data, error } = await query;
+  if (error) { console.error('loadReservations:', error); return; }
+  allReservations = data || [];
+}
+
+function toggleAllDates() {
+  window.allDatesMode = !window.allDatesMode;
+  const btn = document.getElementById('btn-all-dates');
+  const prevBtn = document.getElementById('btn-prev-day');
+  const nextBtn = document.getElementById('btn-next-day');
+  const datePicker = document.getElementById('date-picker');
+  if (window.allDatesMode) {
+    btn.style.borderColor = 'var(--orange)';
+    btn.style.color = 'var(--orange)';
+    btn.style.background = 'var(--orange-dim)';
+    prevBtn.disabled = true; prevBtn.style.opacity = '0.3';
+    nextBtn.disabled = true; nextBtn.style.opacity = '0.3';
+    datePicker.disabled = true; datePicker.style.opacity = '0.3';
+  } else {
+    btn.style.borderColor = ''; btn.style.color = ''; btn.style.background = '';
+    prevBtn.disabled = false; prevBtn.style.opacity = '';
+    nextBtn.disabled = false; nextBtn.style.opacity = '';
+    datePicker.disabled = false; datePicker.style.opacity = '';
+  }
+  loadReservations(selectedDate).then(renderAll);
+}
+
+// ═══════════════════════════════════════════
+// 🖼️ RENDER
+// ═══════════════════════════════════════════
+function renderAll() {
+  renderFloorPlan();
+  renderReservationList();
+  updateStats();
+  updateCapacityBars();
+}
+
+function renderFloorPlan() {
+  const container = document.getElementById('floor-plan');
+  // Clear everything except the edit-mode banner
+  Array.from(container.children).forEach(el => {
+    if (el.id !== 'edit-mode-banner') el.remove();
+  });
+
+  // Group reservations by table (only non-annulées)
+  const byTable = {};
+  allReservations.forEach(r => {
+    if (r.statut === 'Annulée') return;
+    if (!byTable[r.table_assignee]) byTable[r.table_assignee] = [];
+    byTable[r.table_assignee].push(r);
+  });
+
+  // Build table lookup
+  const tableLookup = {};
+  allTables.forEach(t => tableLookup[t.id] = t);
+
+  // Render each zone
+  Object.entries(ZONES).forEach(([zoneName, tableIds]) => {
+    const section = document.createElement('div');
+    const zoneSlug = zoneName.toLowerCase().replace(/[^a-z]/g, '');
+    section.className = `zone-section zone-${zoneSlug}`;
+
+    const activeTables = tableIds.filter(id => tableLookup[id]);
+    const reservedCount = activeTables.filter(id => byTable[id]?.length > 0).length;
+
+    section.innerHTML = `
+      <div class="zone-header">
+        <span class="zone-title">${zoneName}</span>
+        <span class="zone-badge">${reservedCount}/${activeTables.length} réservée${reservedCount > 1 ? 's' : ''}</span>
+      </div>
+      <div class="zone-tables" id="zone-${zoneName.replace(/\s|🍽️|🌿|🍸/g, '')}"></div>
+    `;
+    container.appendChild(section);
+
+    const grid = section.querySelector('.zone-tables');
+    tableIds.forEach(id => {
+      const table = tableLookup[id];
+      if (!table) return;
+      const resas = byTable[id] || [];
+      const card = buildTableCard(table, resas);
+      grid.appendChild(card);
+    });
+  });
+
+  // Tables not in any zone config
+  const configuredIds = Object.values(ZONES).flat();
+  const orphans = allTables.filter(t => !configuredIds.includes(t.id));
+  if (orphans.length > 0) {
+    const section = document.createElement('div');
+    section.className = 'zone-section';
+    section.innerHTML = `
+      <div class="zone-header">
+        <span class="zone-title">📦 Autres tables</span>
+      </div>
+      <div class="zone-tables"></div>
+    `;
+    container.appendChild(section);
+    const grid = section.querySelector('.zone-tables');
+    orphans.forEach(table => {
+      const resas = byTable[table.id] || [];
+      grid.appendChild(buildTableCard(table, resas));
+    });
+  }
+
+  // Bouton "+ Ajouter une table" visible uniquement en mode édition
+  if (window.editModeOn) {
+    const addBtn = document.createElement('button');
+    addBtn.textContent = '+ Ajouter une table';
+    addBtn.style.cssText = 'display:block;margin:16px auto 8px;padding:10px 24px;background:transparent;border:1px dashed var(--orange);color:var(--orange);font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;width:calc(100% - 40px);transition:all .2s;';
+    addBtn.onmouseover = () => { addBtn.style.background = 'var(--orange-dim)'; };
+    addBtn.onmouseout = () => { addBtn.style.background = 'transparent'; };
+    addBtn.addEventListener('click', openAddTableModal);
+    container.appendChild(addBtn);
+  }
+}
+
+function buildTableCard(table, resas) {
+  const card = document.createElement('div');
+  card.className = 'table-card';
+  const cap = parseInt(table.capacite) || 2;
+  if (cap <= 2) card.classList.add('shape-round');
+  else if (cap >= 6) card.classList.add('shape-wide');
+
+  const isInactive = table.active === false;
+  const hasResas = resas.length > 0;
+  const isMulti = resas.length > 1;
+
+  if (isInactive) {
+    card.classList.add('inactive');
+  } else if (isMulti) {
+    card.classList.add('multi');
+  } else if (hasResas) {
+    card.classList.add('reservee');
+  } else {
+    card.classList.add('libre');
+  }
+
+  let statusHTML = '';
+  if (isInactive) {
+    statusHTML = `<span class="table-card-status" style="color:var(--muted)">Fermée</span>`;
+  } else if (isMulti) {
+    statusHTML = `<span class="table-card-status">${resas.length} réservations</span>`;
+  } else if (hasResas) {
+    const r = resas[0];
+    const heure = r.heure ? r.heure.substring(0,5) : '';
+    const occasionIcon = r.occasion ? r.occasion.split(' ')[0] : '';
+    statusHTML = `
+      <span class="table-card-name">${occasionIcon ? `<span title="${r.occasion}" style="margin-right:4px;">${occasionIcon}</span>` : ''}${r.nom_client}</span>
+      <span class="table-card-time">${heure} · ${r.nombre_personnes}p</span>
+    `;
+  } else {
+    statusHTML = `<span class="table-card-status">Libre</span>`;
+  }
+
+  const shortDesc = table.description
+    ? table.description.replace(/\b\d+\s*personnes?\b/gi, '').replace(/\s{2,}/g, ' ').trim()
+    : '';
+  card.innerHTML = `
+    <span class="table-card-id">${table.id}</span>
+    ${shortDesc ? `<span class="table-card-desc">${shortDesc}</span>` : ''}
+    <span class="table-card-cap">👥 ${table.capacite}</span>
+    ${statusHTML}
+  `;
+
+  if (window.editModeOn) {
+    const editBtn = document.createElement('button');
+    editBtn.textContent = '✏️ Modifier';
+    editBtn.style.cssText = 'display:block;position:absolute;top:6px;right:6px;background:var(--orange);border:none;color:#fff;font-size:11px;font-weight:600;cursor:pointer;padding:3px 9px;z-index:10;border-radius:2px;';
+    editBtn.addEventListener('click', (e) => { e.stopPropagation(); openEditTable(table.id); });
+    card.appendChild(editBtn);
+    card.style.cursor = 'default';
+  } else if (!isInactive) {
+    card.addEventListener('click', () => openTableModal(table, resas));
+  }
+  return card;
+}
+
+function renderReservationList() {
+  const container = document.getElementById('resa-list');
+  const active = filterByService(allReservations.filter(r => r.statut !== 'Annulée'));
+
+  if (active.length === 0) {
+    container.innerHTML = `
+      <div class="resa-empty">
+        <div class="resa-empty-icon">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <rect x="3" y="4" width="18" height="18" rx="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+        </div>
+        <p>Aucune réservation<br>${currentService === 'midi' ? 'ce midi' : currentService === 'soir' ? 'ce soir' : 'pour cette journée'}</p>
+      </div>`;
+    return;
+  }
+
+  // Show/hide cancelled-related buttons
+  const cancelledCount = allReservations.filter(r => r.statut === 'Annulée').length;
+  const btnClear = document.getElementById('btn-clear-cancelled');
+  const btnToggle = document.getElementById('btn-toggle-cancelled');
+  if (btnClear) btnClear.style.display = cancelledCount > 0 ? 'inline-block' : 'none';
+  if (btnToggle) btnToggle.style.display = cancelledCount > 0 ? 'inline-block' : 'none';
+
+  container.innerHTML = '';
+  const visibleResas = window.showCancelled
+    ? allReservations
+    : allReservations.filter(r => r.statut !== 'Annulée');
+  filterByService(visibleResas).forEach(r => {
+    const item = document.createElement('div');
+    item.className = 'resa-item';
+    const heure = r.heure ? r.heure.substring(0,5) : '--:--';
+    const isCancelled = r.statut === 'Annulée';
+    item.style.opacity = isCancelled ? '0.45' : '1';
+
+    item.innerHTML = `
+      <div class="resa-time">${window.allDatesMode && r.date_reservation ? `<span style="font-size:9px;display:block;color:var(--muted);margin-bottom:2px;">${r.date_reservation.split('-').reverse().join('/')}</span>` : ''}${heure}</div>
+      <div class="resa-info">
+        <div class="resa-name">${r.nom_client}</div>
+        <div class="resa-meta">${r.telephone || ''}${r.email ? ' · ' + r.email : ''}</div>
+        <div class="resa-badges">
+          <span class="badge badge-table">${r.table_assignee || '?'}</span>
+          <span class="badge badge-persons">👥 ${r.nombre_personnes}</span>
+          <span class="badge ${isCancelled ? 'badge-cancelled' : r.statut==='No-show' ? 'badge-noshow' : r.statut==='Terminée' ? 'badge-termine' : r.statut==='Arrivé' ? 'badge-arrive' : 'badge-confirmed'}">${r.statut || 'Confirmée'}</span>
+          ${r.occasion ? `<span class="badge" style="background:rgba(168,85,247,0.15);border-color:rgba(168,85,247,0.4);color:#c084fc;">${r.occasion}</span>` : ''}
+        </div>
+      </div>
+      ${isCancelled ? `<button class="btn-delete-resa" data-delete-id="${r.id}" title="Supprimer définitivement" style="margin-left:auto;padding:6px 10px;background:transparent;border:1px solid rgba(224,80,80,0.35);color:var(--red);border-radius:2px;font-size:13px;cursor:pointer;flex-shrink:0;transition:all .2s;" onmouseover="this.style.background='var(--red-dim)'" onmouseout="this.style.background='transparent'">🗑️</button>` : ''}
+    `;
+    if (!isCancelled) {
+      const tableObj = allTables.find(t => t.id === r.table_assignee);
+      item.addEventListener('click', () => openTableModal(tableObj || { id: r.table_assignee }, [r]));
+    } else {
+      item.querySelector('[data-delete-id]')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteReservation(r.id);
+      });
+    }
+    container.appendChild(item);
+  });
+}
+
+function updateStats() {
+  const active = allReservations.filter(r => r.statut !== 'Annulée');
+  const couverts = active.reduce((sum, r) => sum + (parseInt(r.nombre_personnes) || 0), 0);
+  const configuredIds = Object.values(ZONES).flat();
+  const reservedIds = new Set(active.map(r => r.table_assignee));
+  const totalActive = allTables.filter(t => t.active !== false && configuredIds.includes(t.id)).length;
+  const libres = totalActive - [...reservedIds].filter(id => configuredIds.includes(id)).length;
+
+  document.getElementById('stat-resas').textContent    = active.length;
+  document.getElementById('stat-couverts').textContent = couverts;
+  document.getElementById('stat-libres').textContent   = Math.max(0, libres);
+}
+
+// ═══════════════════════════════════════════
+// 🗂️ MODAL TABLE DETAIL
+// ═══════════════════════════════════════════
+function openTableModal(table, resas) {
+  const title   = document.getElementById('modal-table-title');
+  const body    = document.getElementById('modal-table-body');
+  const footer  = document.getElementById('modal-table-footer');
+
+  const tableDesc = table.description ? ` — ${table.description}` : '';
+  title.textContent = `${table.id}${tableDesc}`;
+
+  if (resas.length === 0) {
+    body.innerHTML = `
+      <div style="text-align:center; padding: 30px 0; color: var(--muted)">
+        <div style="font-size:36px;margin-bottom:12px">🟢</div>
+        <div style="font-size:15px;font-weight:600;color:var(--text)">Table libre</div>
+        <div style="margin-top:6px;font-size:13px">Capacité : ${table.capacite} personnes</div>
+      </div>`;
+    footer.innerHTML = `
+      <button class="btn btn-secondary" data-close="modal-table">Fermer</button>
+      <button class="btn btn-primary" id="modal-btn-create">＋ Réserver cette table</button>`;
+    footer.querySelector('#modal-btn-create').addEventListener('click', () => {
+      closeModal('modal-table');
+      openNewResaModal(table.id);
+    });
+  } else {
+    body.innerHTML = resas.map(r => buildResaSlot(r)).join('');
+    footer.innerHTML = `<button class="btn btn-secondary" data-close="modal-table">Fermer</button>`;
+
+    // Wire up cancel buttons
+    body.querySelectorAll('[data-cancel-id]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.cancelId;
+        await cancelReservation(id);
+      });
+    });
+    // Wire up edit buttons
+    body.querySelectorAll('[data-edit-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const r = resas.find(r => r.id === btn.dataset.editId);
+        if (r) { closeModal('modal-table'); openEditModal(r); }
+      });
+    });
+  }
+
+  // Wire close buttons
+  footer.querySelectorAll('[data-close]').forEach(btn => {
+    btn.addEventListener('click', () => closeModal(btn.dataset.close));
+  });
+
+  openModal('modal-table');
+}
+
+function buildResaSlot(r) {
+  const heure = r.heure ? r.heure.substring(0,5) : '--:--';
+  const isCancelled = r.statut === 'Annulée';
+  return `
+    <div class="resa-slot" style="${isCancelled ? 'opacity:.5' : ''}">
+      <div class="resa-slot-header">
+        <span class="resa-slot-time">🕐 ${heure}</span>
+        <span class="badge ${isCancelled ? 'badge-cancelled' : r.statut==='Arrivé' ? 'badge-arrive' : r.statut==='No-show' ? 'badge-noshow' : r.statut==='Terminée' ? 'badge-termine' : 'badge-confirmed'}">${isCancelled ? 'Annulée' : r.statut || 'Confirmée'}</span>
+      </div>
+      <div class="detail-section">
+        <div class="detail-section-title">👤 Client</div>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <label>Nom</label>
+            <span>${r.nom_client}</span>
+          </div>
+          <div class="detail-item">
+            <label>Personnes</label>
+            <span>👥 ${r.nombre_personnes}</span>
+          </div>
+          <div class="detail-item">
+            <label>Téléphone</label>
+            <span>${r.telephone || '—'}</span>
+          </div>
+          <div class="detail-item">
+            <label>Email</label>
+            <span style="font-size:12px">${r.email || '—'}</span>
+          </div>
+          ${r.occasion ? `
+          <div class="detail-item full">
+            <label>Occasion</label>
+            <div class="notes-box" style="color:#c084fc;">${r.occasion}</div>
+          </div>` : ''}
+          ${r.notes ? `
+          <div class="detail-item full">
+            <label>Notes</label>
+            <div class="notes-box">${r.notes}</div>
+          </div>` : ''}
+        </div>
+      </div>
+      ${!isCancelled ? `
+      <div style="margin-top:6px;display:flex;gap:8px;">
+        <button class="btn btn-secondary" data-edit-id="${r.id}" style="flex:1">✏️ Modifier</button>
+        <button class="btn btn-danger" data-cancel-id="${r.id}" style="flex:1">🗑️ Annuler</button>
+      </div>` : ''}
+    </div>
+  `;
+}
+
+async function cancelReservation(id) {
+  const confirmed = await confirmAction('Annuler cette réservation ?', 'Cette action est irréversible.');
+  if (!confirmed) return;
+
+  const { error } = await db.from('reservations').update({ statut: 'Annulée' }).eq('id', id);
+  if (error) {
+    showToast('Erreur', 'Impossible d\'annuler la réservation.', 'error');
+    return;
+  }
+  closeModal('modal-table');
+  showToast('Réservation annulée', 'La réservation a été annulée.', 'info');
+  await refreshData();
+  // Check waitlist for that date
+  const wl = allWaitlist.filter(w => w.date_souhaitee === selectedDate);
+  if (wl.length > 0) showToast('⏳ Liste d\'attente', `${wl.length} personne(s) attendent une table aujourd'hui !`, 'new-resa');
+}
+
+async function deleteReservation(id) {
+  const confirmed = await confirmAction('Supprimer définitivement ?', 'Cette réservation annulée sera supprimée de la base de données.');
+  if (!confirmed) return;
+
+  const { error } = await db.from('reservations').delete().eq('id', id);
+  if (error) {
+    showToast('Erreur', 'Impossible de supprimer la réservation.', 'error');
+    return;
+  }
+  showToast('Supprimée', 'La réservation a été supprimée.', 'info');
+  await refreshData();
+}
+
+async function deleteAllCancelled() {
+  const cancelled = allReservations.filter(r => r.statut === 'Annulée');
+  if (cancelled.length === 0) { showToast('Info', 'Aucune réservation annulée à supprimer.', 'info'); return; }
+
+  const confirmed = await confirmAction(
+    `Supprimer ${cancelled.length} réservation${cancelled.length > 1 ? 's' : ''} annulée${cancelled.length > 1 ? 's' : ''} ?`,
+    'Cette action supprimera définitivement toutes les réservations annulées de cette journée.'
+  );
+  if (!confirmed) return;
+
+  const ids = cancelled.map(r => `id=in.(${cancelled.map(r => `"${r.id}"`).join(',')})`);
+  const { error } = await db.from('reservations').delete().in('id', cancelled.map(r => r.id));
+  if (error) {
+    showToast('Erreur', 'Impossible de supprimer les réservations.', 'error');
+    return;
+  }
+  showToast('Nettoyé', `${cancelled.length} réservation${cancelled.length > 1 ? 's' : ''} supprimée${cancelled.length > 1 ? 's' : ''}.`, 'success');
+  await refreshData();
+}
+
+// ═══════════════════════════════════════════
+// ➕ NOUVELLE RÉSERVATION
+// ═══════════════════════════════════════════
+function openNewResaModal(presetTable = '') {
+  const form = document.getElementById('new-resa-form');
+  form.reset();
+  document.getElementById('edit-id-field').value = '';
+  document.getElementById('client-lookup-badge').style.display = 'none';
+  document.getElementById('client-lookup-info').style.display = 'none';
+  document.getElementById('client-allergen-warning').style.display = 'none';
+  document.querySelector('#modal-new-resa h3').textContent = 'Nouvelle réservation';
+  document.getElementById('btn-submit-resa').textContent = 'Créer la réservation';
+  form.querySelector('[name=date_reservation]').value = selectedDate;
+  if (presetTable) form.querySelector('[name=table_assignee]').value = presetTable;
+  document.getElementById('resa-statut-group').style.display = 'none';
+  openModal('modal-new-resa');
+}
+
+function openEditModal(r) {
+  const form = document.getElementById('new-resa-form');
+  form.reset();
+  document.getElementById('edit-id-field').value = r.id;
+  document.querySelector('#modal-new-resa h3').textContent = '✏️ Modifier la réservation';
+  document.getElementById('btn-submit-resa').textContent = 'Enregistrer les modifications';
+  form.querySelector('[name=nom_client]').value    = r.nom_client || '';
+  form.querySelector('[name=telephone]').value     = r.telephone || '';
+  form.querySelector('[name=email]').value         = r.email || '';
+  form.querySelector('[name=date_reservation]').value = r.date_reservation || selectedDate;
+  form.querySelector('[name=heure]').value         = (r.heure || '').substring(0,5);
+  form.querySelector('[name=nombre_personnes]').value = r.nombre_personnes || 2;
+  form.querySelector('[name=table_assignee]').value = r.table_assignee || '';
+  form.querySelector('[name=notes]').value         = r.notes || '';
+  form.querySelector('[name=occasion]').value      = r.occasion || '';
+  // Show status select in edit mode
+  document.getElementById('resa-statut-group').style.display = '';
+  document.getElementById('resa-statut-select').value = r.statut || 'Confirmée';
+  openModal('modal-new-resa');
+}
+
+document.getElementById('btn-new-resa').addEventListener('click', () => openNewResaModal());
+document.getElementById('btn-clear-cancelled').addEventListener('click', deleteAllCancelled);
+
+// ── Lookup client par téléphone ──
+let lookupTimeout = null;
+document.getElementById('resa-telephone').addEventListener('input', function() {
+  clearTimeout(lookupTimeout);
+  const badge = document.getElementById('client-lookup-badge');
+  const digits = this.value.replace(/\D/g, '');
+  badge.style.display = 'none';
+  if (digits.length < 8) return;
+  lookupTimeout = setTimeout(async () => {
+    const { data } = await db.from('clients').select('*').eq('telephone', this.value.trim()).maybeSingle();
+    if (!data) {
+      // Try with normalized digits
+      const { data: data2 } = await db.from('clients').select('*').ilike('telephone', '%' + digits.slice(-8)).maybeSingle();
+      if (!data2) return;
+      fillClientFromLookup(data2);
+    } else {
+      fillClientFromLookup(data);
+    }
+  }, 500);
+});
+
+function fillClientFromLookup(client) {
+  const form = document.getElementById('new-resa-form');
+  const badge = document.getElementById('client-lookup-badge');
+  const infoBox = document.getElementById('client-lookup-info');
+  const allergenBox = document.getElementById('client-allergen-warning');
+  // Only fill if in create mode (not edit)
+  if (document.getElementById('edit-id-field').value) return;
+
+  const nomInput = form.querySelector('[name=nom_client]');
+  const emailInput = form.querySelector('[name=email]');
+  if (!nomInput.value) nomInput.value = client.nom;
+  if (!emailInput.value && client.email) emailInput.value = client.email;
+
+  // Badge téléphone
+  badge.style.display = 'flex';
+  badge.style.alignItems = 'center';
+  badge.style.gap = '4px';
+  badge.style.background = 'rgba(76,175,125,0.15)';
+  badge.style.color = '#4caf7d';
+  badge.style.border = '1px solid rgba(76,175,125,0.3)';
+  badge.innerHTML = `✓ ${client.nb_reservations || 0} visite${(client.nb_reservations||0) !== 1 ? 's' : ''}`;
+
+  // Info box avec VIP
+  const vipLabel = client.vip ? ' <span style="color:#ffd700">⭐ VIP</span>' : '';
+  const lastVisit = client.derniere_visite ? new Date(client.derniere_visite).toLocaleDateString('fr-FR') : '—';
+  infoBox.style.display = 'block';
+  infoBox.innerHTML = `✓ Client connu${vipLabel} · ${client.nb_reservations || 0} réservation(s) · Dernière visite : ${lastVisit}`;
+
+  // Allergènes
+  if (client.allergenes) {
+    allergenBox.style.display = 'block';
+    allergenBox.innerHTML = `⚠️ <strong>Allergènes :</strong> ${client.allergenes}`;
+  } else {
+    allergenBox.style.display = 'none';
+  }
+}
+
+window.showCancelled = false;
+document.getElementById('btn-toggle-cancelled').addEventListener('click', () => {
+  window.showCancelled = !window.showCancelled;
+  const btn = document.getElementById('btn-toggle-cancelled');
+  if (window.showCancelled) {
+    btn.style.borderColor = 'var(--orange)';
+    btn.style.color = 'var(--orange)';
+    btn.textContent = '👁 Masquer annulées';
+  } else {
+    btn.style.borderColor = 'var(--border2)';
+    btn.style.color = 'var(--muted)';
+    btn.textContent = '👁 Annulées';
+  }
+  renderReservationList();
+});
+
+document.getElementById('btn-submit-resa').addEventListener('click', async () => {
+  const form = document.getElementById('new-resa-form');
+  if (!form.checkValidity()) { form.reportValidity(); return; }
+
+  const fd = new FormData(form);
+  const payload = {
+    nom_client:      fd.get('nom_client').trim(),
+    telephone:       fd.get('telephone').trim(),
+    email:           fd.get('email').trim(),
+    date:            fd.get('date_reservation'),
+    heure:           fd.get('heure'),
+    nombre_personnes: parseInt(fd.get('nombre_personnes')),
+    notes:           fd.get('notes').trim(),
+    occasion:        fd.get('occasion') || '',
+    table_assignee:  fd.get('table_assignee') || undefined,
+  };
+
+  const editId = fd.get('edit_id');
+  const btn = document.getElementById('btn-submit-resa');
+  btn.textContent = editId ? 'Enregistrement…' : 'Création…'; btn.disabled = true;
+
+  try {
+    if (editId) {
+      // ── MODE ÉDITION ──
+      const newStatut = document.getElementById('resa-statut-select').value || 'Confirmée';
+      const { error } = await db.from('reservations').update({
+        nom_client:       payload.nom_client,
+        telephone:        payload.telephone,
+        email:            payload.email,
+        date_reservation: payload.date,
+        heure:            payload.heure.substring(0,5),
+        nombre_personnes: payload.nombre_personnes,
+        notes:            payload.notes || null,
+        occasion:         payload.occasion || null,
+        table_assignee:   payload.table_assignee || null,
+        statut:           newStatut,
+      }).eq('id', editId);
+      if (error) throw error;
+      showToast('Réservation modifiée ✓', `${payload.nom_client} — ${payload.heure}`, 'success');
+    } else if (USE_N8N_WEBHOOK) {
+      // Via N8N webhook (emails inclus)
+      const res = await fetch(N8N_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message || 'Erreur webhook');
+      showToast('Réservation créée ✓', `${payload.nom_client} — ${payload.heure}`, 'success');
+    } else {
+      // Direct Supabase
+      const id = 'RES-' + payload.date.replace(/-/g,'') + '-' + Date.now().toString().slice(-6);
+      const tableId = payload.table_assignee || await findAvailableTable(payload.date, payload.heure, payload.nombre_personnes);
+      if (!tableId) {
+        // Offer waitlist
+        btn.textContent = editId ? 'Enregistrer les modifications' : 'Créer la réservation'; btn.disabled = false;
+        openWaitlistModal({ nom_client: payload.nom_client, telephone: payload.telephone, email: payload.email, date: payload.date, heure: payload.heure, nombre_personnes: payload.nombre_personnes });
+        return;
+      }
+      const cancelToken = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
+      const { error } = await db.from('reservations').insert({
+        id,
+        nom_client: payload.nom_client,
+        telephone: payload.telephone,
+        email: payload.email,
+        date_reservation: payload.date,
+        heure: payload.heure.substring(0,5),
+        nombre_personnes: payload.nombre_personnes,
+        notes: payload.notes,
+        occasion: payload.occasion || null,
+        table_assignee: tableId,
+        statut: 'Confirmée',
+        cancel_token: cancelToken,
+      });
+      if (error) throw error;
+      showToast('Réservation créée ✓', `${payload.nom_client} — Table ${tableId}`, 'success');
+    }
+    closeModal('modal-new-resa');
+    await refreshData();
+  } catch (err) {
+    showToast('Erreur', err.message || 'Une erreur est survenue.', 'error');
+  } finally {
+    btn.textContent = editId ? 'Enregistrer les modifications' : 'Créer la réservation';
+    btn.disabled = false;
+  }
+});
+
+// ═══════════════════════════════════════════
+// 👤 CLIENTS
+// ═══════════════════════════════════════════
+let allClients = [];
+let currentEditClientId = null;
+
+function switchTab(tab) {
+  const tabs = ['reservations','clients','stats','commandes','annulations'];
+  document.getElementById('app-main').style.display         = tab === 'reservations' ? 'flex' : 'none';
+  document.getElementById('view-clients').style.display      = tab === 'clients' ? 'flex' : 'none';
+  document.getElementById('view-stats').style.display        = tab === 'stats' ? 'flex' : 'none';
+  document.getElementById('view-commandes').style.display    = tab === 'commandes' ? 'flex' : 'none';
+  document.getElementById('view-annulations').style.display  = tab === 'annulations' ? 'flex' : 'none';
+  tabs.forEach(t => {
+    const btn = document.getElementById('tab-' + t);
+    if (!btn) return;
+    const active = t === tab;
+    btn.style.background   = active ? 'var(--orange)' : 'transparent';
+    btn.style.color        = active ? '#fff' : 'var(--muted)';
+    btn.style.borderColor  = active ? 'var(--orange)' : 'var(--border2)';
+  });
+  if (tab === 'clients')     loadClients();
+  if (tab === 'stats')       loadStats();
+  if (tab === 'commandes')   { loadCommandes(); clearCmdBadge(); }
+  if (tab === 'annulations') { loadAnnulations(); clearAnnulBadge(); }
+}
+
+async function loadClients() {
+  const { data, error } = await db.from('clients').select('*').order('derniere_visite', { ascending: false });
+  if (error) { showToast('Erreur', 'Impossible de charger les clients.', 'error'); return; }
+  allClients = data || [];
+  renderClients(allClients);
+}
+
+function renderClients(list) {
+  const tbody = document.getElementById('clients-tbody');
+  const empty = document.getElementById('clients-empty');
+  const count = document.getElementById('clients-count');
+  count.textContent = `${list.length} client${list.length > 1 ? 's' : ''} enregistré${list.length > 1 ? 's' : ''}`;
+  if (list.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  tbody.innerHTML = list.map(c => {
+    const allergenesEscaped = (c.allergenes||'').replace(/'/g,"\\'").replace(/`/g,'\\`');
+    const notesEscaped = (c.notes_internes||'').replace(/`/g,'\\`');
+    const nomEscaped = c.nom.replace(/'/g,"\\'");
+    return `
+    <tr style="border-bottom:1px solid var(--border);transition:background .15s;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">
+      <td style="padding:12px 8px;text-align:center;">
+        <button class="vip-toggle" onclick="toggleVIP('${c.id}', ${!c.vip})" title="${c.vip ? 'Retirer VIP' : 'Marquer VIP'}">${c.vip ? '⭐' : '☆'}</button>
+      </td>
+      <td style="padding:12px 12px;font-weight:600;">${c.nom}${c.vip ? ' <span style="color:#ffd700;font-size:11px;">VIP</span>' : ''}</td>
+      <td style="padding:12px 12px;color:var(--muted);">${c.telephone || '—'}</td>
+      <td style="padding:12px 12px;color:var(--muted);font-size:12px;">${c.email || '—'}</td>
+      <td style="padding:12px 12px;font-size:12px;${c.allergenes ? 'color:var(--orange)' : 'color:var(--muted)'};">${c.allergenes ? '⚠️ ' + c.allergenes : '—'}</td>
+      <td style="padding:12px 8px;text-align:center;"><span style="background:var(--orange-dim);color:var(--orange);padding:3px 10px;font-weight:700;font-size:13px;">${c.nb_reservations || 0}</span></td>
+      <td style="padding:12px 12px;color:var(--muted);font-size:12px;">${c.derniere_visite ? new Date(c.derniere_visite).toLocaleDateString('fr-FR') : '—'}</td>
+      <td style="padding:12px 12px;">
+        <button onclick="openClientNotes('${c.id}', '${nomEscaped}', \`${notesEscaped}\`, \`${allergenesEscaped}\`)"
+          style="background:transparent;border:1px solid var(--border2);color:${(c.notes_internes||c.allergenes) ? 'var(--orange)' : 'var(--muted)'};padding:4px 10px;font-size:11px;cursor:pointer;transition:all .2s;"
+          onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'"
+          onmouseout="this.style.borderColor='var(--border2)'">
+          ${(c.notes_internes||c.allergenes) ? '📝 Modifier' : '＋ Note'}
+        </button>
+      </td>
+      <td style="padding:12px 12px;">
+        <button onclick="openClientHistory('${c.telephone.replace(/'/g,"\\'")}', '${nomEscaped}')"
+          style="background:transparent;border:1px solid var(--border2);color:var(--muted);padding:4px 10px;font-size:11px;cursor:pointer;transition:all .2s;"
+          onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'"
+          onmouseout="this.style.borderColor='var(--border2)'">
+          📋 Voir
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function filterClients(q) {
+  if (!q.trim()) { renderClients(allClients); return; }
+  const lq = q.toLowerCase();
+  renderClients(allClients.filter(c =>
+    (c.nom||'').toLowerCase().includes(lq) ||
+    (c.telephone||'').includes(lq) ||
+    (c.email||'').toLowerCase().includes(lq)
+  ));
+}
+
+function openClientNotes(id, nom, notes, allergenes) {
+  currentEditClientId = id;
+  document.getElementById('modal-client-name').textContent = '📝 Fiche — ' + nom;
+  document.getElementById('client-notes-input').value = notes || '';
+  document.getElementById('client-allergenes-input').value = allergenes || '';
+  openModal('modal-client-notes');
+}
+
+document.getElementById('btn-save-client-notes').addEventListener('click', async () => {
+  if (!currentEditClientId) return;
+  const notes = document.getElementById('client-notes-input').value.trim();
+  const allergenes = document.getElementById('client-allergenes-input').value.trim();
+  const { error } = await db.from('clients').update({
+    notes_internes: notes || null,
+    allergenes: allergenes || null,
+    updated_at: new Date().toISOString()
+  }).eq('id', currentEditClientId);
+  if (error) { showToast('Erreur', 'Impossible d\'enregistrer.', 'error'); return; }
+  closeModal('modal-client-notes');
+  showToast('Fiche mise à jour ✓', '', 'success');
+  await loadClients();
+});
+
+document.querySelectorAll('[data-close="modal-client-notes"]').forEach(btn => {
+  btn.addEventListener('click', () => closeModal('modal-client-notes'));
+});
+
+function filterByService(reservations) {
+  if (currentService === 'midi') return reservations.filter(r => {
+    const h = parseInt((r.heure || '00:00').split(':')[0]);
+    return h >= 11 && h < 16;
+  });
+  if (currentService === 'soir') return reservations.filter(r => {
+    const h = parseInt((r.heure || '00:00').split(':')[0]);
+    return h >= 17;
+  });
+  return reservations;
+}
+
+async function findAvailableTable(date, heure, nbPersonnes) {
+  const { data: resas } = await db.from('reservations').select('table_assignee').eq('date_reservation', date).neq('statut', 'Annulée');
+  const occupied = new Set((resas || []).map(r => r.table_assignee));
+  const table = allTables.find(t => t.active !== false && parseInt(t.capacite) >= nbPersonnes && !occupied.has(t.id));
+  return table ? table.id : null;
+}
+
+// ═══════════════════════════════════════════
+// ⚡ REALTIME
+// ═══════════════════════════════════════════
+function subscribeRealtime() {
+  cleanupRealtime();
+  realtimeChannel = db.channel('reservations-live')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, async (payload) => {
+      const prev = allReservations.length;
+      await loadReservations(selectedDate);
+      renderAll();
+
+      if (payload.eventType === 'INSERT') {
+        const r = payload.new;
+        if (r.date_reservation === selectedDate) {
+          showToast(
+            '🔔 Nouvelle réservation !',
+            `${r.nom_client} — ${(r.heure||'').substring(0,5)} · Table ${r.table_assignee}`,
+            'new-resa'
+          );
+          playNotifSound();
+        }
+      }
+    })
+    .subscribe((status) => {
+      const dot = document.getElementById('live-dot');
+      dot.classList.toggle('connected', status === 'SUBSCRIBED');
+    });
+}
+
+function cleanupRealtime() {
+  if (realtimeChannel) { db.removeChannel(realtimeChannel); realtimeChannel = null; }
+}
+
+async function refreshData() {
+  await Promise.all([loadReservations(selectedDate), loadWaitlist()]);
+  renderAll();
+}
+
+// ═══════════════════════════════════════════
+// 📅 DATE NAV
+// ═══════════════════════════════════════════
+function setupUIListeners() {
+  document.getElementById('date-picker').addEventListener('change', async (e) => {
+    selectedDate = e.target.value;
+    updateDateLabel();
+    await loadReservations(selectedDate);
+    renderAll();
+  });
+  document.getElementById('btn-prev-day').addEventListener('click', () => changeDay(-1));
+  document.getElementById('btn-next-day').addEventListener('click', () => changeDay(1));
+
+  document.querySelectorAll('.service-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.service-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentService = btn.dataset.service;
+      renderAll();
+    });
+  });
+
+  // Modal close via overlay click
+  document.querySelectorAll('.modal-overlay').forEach(el => {
+    el.addEventListener('click', (e) => { if (e.target === el) closeModal(el.id); });
+  });
+  document.querySelectorAll('[data-close]').forEach(btn => {
+    btn.addEventListener('click', () => closeModal(btn.dataset.close));
+  });
+}
+
+async function changeDay(delta) {
+  const d = new Date(selectedDate);
+  d.setDate(d.getDate() + delta);
+  selectedDate = d.toISOString().split('T')[0];
+  document.getElementById('date-picker').value = selectedDate;
+  updateDateLabel();
+  await loadReservations(selectedDate);
+  renderAll();
+}
+
+function updateDateLabel() {
+  const d = new Date(selectedDate + 'T12:00:00');
+  const label = d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+  document.getElementById('date-label').textContent = label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+// ═══════════════════════════════════════════
+// 🔔 TOASTS
+// ═══════════════════════════════════════════
+function showToast(title, msg, type = 'info') {
+  const icons = { success: '✅', error: '❌', info: 'ℹ️', 'new-resa': '🔔' };
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `
+    <span class="toast-icon">${icons[type] || 'ℹ️'}</span>
+    <div class="toast-text">
+      <div class="toast-title">${title}</div>
+      ${msg ? `<div class="toast-msg">${msg}</div>` : ''}
+    </div>
+  `;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add('removing');
+    setTimeout(() => toast.remove(), 280);
+  }, 4500);
+}
+
+function playNotifSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [523, 659, 784].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.12);
+      gain.gain.linearRampToValueAtTime(0.18, ctx.currentTime + i * 0.12 + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.2);
+      osc.start(ctx.currentTime + i * 0.12);
+      osc.stop(ctx.currentTime + i * 0.12 + 0.25);
+    });
+  } catch (e) { /* silent fail if audio blocked */ }
+}
+
+// ═══════════════════════════════════════════
+// 🗔 MODALS
+// ═══════════════════════════════════════════
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+// ═══════════════════════════════════════════
+// ✅ CONFIRM DIALOG
+// ═══════════════════════════════════════════
+function confirmAction(title, msg) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay open';
+    overlay.style.zIndex = '9999';
+    overlay.innerHTML = `
+      <div class="modal-box" style="max-width:380px">
+        <div class="modal-header"><h3>${title}</h3></div>
+        <div class="modal-body" style="color:var(--muted);font-size:14px">${msg}</div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="confirm-no">Annuler</button>
+          <button class="btn btn-danger" id="confirm-yes">Confirmer</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#confirm-yes').addEventListener('click', () => { overlay.remove(); resolve(true); });
+    overlay.querySelector('#confirm-no').addEventListener('click',  () => { overlay.remove(); resolve(false); });
+  });
+}
+
+// ═══════════════════════════════════════════
+// 🖥️ SCREENS
+// ═══════════════════════════════════════════
+function showScreen(name) {
+  document.getElementById('screen-login').style.display     = name === 'login'     ? '' : 'none';
+  document.getElementById('screen-dashboard').style.display = name === 'dashboard' ? '' : 'none';
+  if (name !== 'loading') hideLoading();
+}
+function hideLoading() {
+  const el = document.getElementById('loading-overlay');
+  if (el) el.remove();
+}
+
+// ═══════════════════════════════════════════
+// ⭐ VIP TOGGLE
+// ═══════════════════════════════════════════
+async function toggleVIP(clientId, newVip) {
+  const { error } = await db.from('clients').update({ vip: newVip, updated_at: new Date().toISOString() }).eq('id', clientId);
+  if (error) { showToast('Erreur', 'Impossible de modifier le statut VIP.', 'error'); return; }
+  showToast(newVip ? '⭐ Client VIP' : 'VIP retiré', '', 'success');
+  await loadClients();
+}
+
+// ═══════════════════════════════════════════
+// ⏳ LISTE D'ATTENTE
+// ═══════════════════════════════════════════
+let allWaitlist = [];
+
+async function loadWaitlist() {
+  const { data } = await db.from('liste_attente')
+    .select('*').eq('statut', 'En attente')
+    .eq('date_souhaitee', selectedDate)
+    .order('created_at');
+  allWaitlist = data || [];
+  renderWaitlist();
+}
+
+function renderWaitlist() {
+  const section = document.getElementById('waitlist-section');
+  const list = document.getElementById('waitlist-list');
+  const countEl = document.getElementById('waitlist-count');
+  countEl.textContent = allWaitlist.length;
+  section.style.display = allWaitlist.length > 0 ? 'block' : 'none';
+  if (allWaitlist.length === 0) { list.innerHTML = ''; return; }
+  list.innerHTML = allWaitlist.map(w => `
+    <div class="waitlist-item">
+      <div class="waitlist-info">
+        <div class="waitlist-name">${w.nom_client}</div>
+        <div class="waitlist-meta">${w.telephone} · ${w.nombre_personnes}p · ${(w.heure_souhaitee||'').substring(0,5)||'—'}</div>
+      </div>
+      <button class="waitlist-notify-btn" onclick="notifyWaitlist('${w.id}', '${w.nom_client.replace(/'/g,"\\'")}')">📞 Notifier</button>
+    </div>
+  `).join('');
+}
+
+async function notifyWaitlist(id, nom) {
+  const ok = await confirmAction(`Notifier ${nom} ?`, 'La réservation sera marquée "Notifié" et le client sera contacté.');
+  if (!ok) return;
+  await db.from('liste_attente').update({ statut: 'Notifié' }).eq('id', id);
+  showToast('Notification envoyée', `${nom} a été notifié(e)`, 'success');
+  await loadWaitlist();
+}
+
+function openWaitlistModal(payload) {
+  document.getElementById('wl-nom').value   = payload.nom_client;
+  document.getElementById('wl-tel').value   = payload.telephone;
+  document.getElementById('wl-email').value = payload.email || '';
+  document.getElementById('wl-date').value  = payload.date;
+  document.getElementById('wl-heure').value = payload.heure || '';
+  document.getElementById('wl-nb').value    = payload.nombre_personnes;
+  document.getElementById('wl-notes').value = '';
+  openModal('modal-waitlist');
+}
+
+document.getElementById('btn-confirm-waitlist').addEventListener('click', async () => {
+  const id = 'ATT-' + document.getElementById('wl-date').value.replace(/-/g,'') + '-' + Date.now().toString().slice(-6);
+  const { error } = await db.from('liste_attente').insert({
+    id,
+    nom_client:      document.getElementById('wl-nom').value,
+    telephone:       document.getElementById('wl-tel').value,
+    email:           document.getElementById('wl-email').value || null,
+    date_souhaitee:  document.getElementById('wl-date').value,
+    heure_souhaitee: document.getElementById('wl-heure').value || null,
+    nombre_personnes: parseInt(document.getElementById('wl-nb').value) || 2,
+    notes:           document.getElementById('wl-notes').value.trim() || null,
+  });
+  if (error) { showToast('Erreur', error.message, 'error'); return; }
+  closeModal('modal-waitlist');
+  closeModal('modal-new-resa');
+  showToast('Inscrit en liste d\'attente ✓', document.getElementById('wl-nom').value, 'success');
+  await loadWaitlist();
+});
+
+document.querySelectorAll('[data-close="modal-waitlist"]').forEach(b => b.addEventListener('click', () => closeModal('modal-waitlist')));
+document.querySelectorAll('[data-close="modal-qr"]').forEach(b => b.addEventListener('click', () => closeModal('modal-qr')));
+document.querySelectorAll('[data-close="modal-blocages"]').forEach(b => b.addEventListener('click', () => closeModal('modal-blocages')));
+document.querySelectorAll('[data-close="modal-client-history"]').forEach(b => b.addEventListener('click', () => closeModal('modal-client-history')));
+document.querySelectorAll('[data-close="modal-edit-table"]').forEach(b => b.addEventListener('click', () => closeModal('modal-edit-table')));
+document.querySelectorAll('[data-close="modal-capacity"]').forEach(b => b.addEventListener('click', () => closeModal('modal-capacity')));
+
+// ═══════════════════════════════════════════
+// 📋 HISTORIQUE CLIENT
+// ═══════════════════════════════════════════
+async function openClientHistory(telephone, nom) {
+  document.getElementById('modal-history-title').textContent = `📋 Historique — ${nom}`;
+  const listEl = document.getElementById('client-history-list');
+  listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">Chargement…</div>';
+  openModal('modal-client-history');
+
+  const { data, error } = await db.from('reservations')
+    .select('*').eq('telephone', telephone)
+    .order('date_reservation', { ascending: false }).limit(50);
+
+  if (error || !data?.length) {
+    listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">Aucune réservation trouvée.</div>';
+    return;
+  }
+
+  const statColors = { 'Confirmée': 'var(--green)', 'Terminée': '#6dc86d', 'No-show': '#c084fc', 'Annulée': 'var(--red)' };
+  listEl.innerHTML = data.map(r => {
+    const d = new Date(r.date_reservation + 'T12:00:00');
+    const dateStr = d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    const color = statColors[r.statut] || 'var(--orange)';
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);">
+        <div>
+          <div style="font-weight:600;font-size:13px;">${dateStr} à ${(r.heure||'').slice(0,5)}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:3px;">${r.nombre_personnes} pers. · Table ${r.table_assignee || '—'}${r.notes ? ` · <em>${r.notes}</em>` : ''}</div>
+        </div>
+        <span style="font-size:11px;font-weight:700;color:${color};letter-spacing:.5px;white-space:nowrap;margin-left:12px;">${r.statut || 'Confirmée'}</span>
+      </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════
+// ⚙️ PLAN DE SALLE ÉDITABLE
+// ═══════════════════════════════════════════
+window.editModeOn = false;
+
+function toggleEditMode() {
+  window.editModeOn = !window.editModeOn;
+  const fp = document.getElementById('floor-plan');
+  const btn = document.getElementById('btn-edit-plan');
+  const banner = document.getElementById('edit-mode-banner');
+  fp.classList.toggle('edit-mode', window.editModeOn);
+  banner.style.display = window.editModeOn ? '' : 'none';
+  if (btn) {
+    btn.style.borderColor = window.editModeOn ? 'var(--orange)' : '';
+    btn.style.color = window.editModeOn ? 'var(--orange)' : '';
+  }
+  renderFloorPlan(); // re-render to add/remove edit buttons
+}
+
+function openAddTableModal() {
+  document.getElementById('et-mode').value = 'create';
+  document.getElementById('et-id').value = '';
+  document.getElementById('et-id-display').value = '';
+  document.getElementById('et-id-display').disabled = false;
+  document.getElementById('et-capacite').value = 2;
+  document.getElementById('et-description').value = '';
+  document.getElementById('et-active').value = 'true';
+  document.getElementById('btn-delete-table').style.display = 'none';
+  const zonesSaved = JSON.parse(localStorage.getItem('bazar-zones') || 'null') || ZONES;
+  const zoneEl = document.getElementById('et-zone');
+  zoneEl.innerHTML = Object.keys(zonesSaved).map(z => `<option value="${z}">${z}</option>`).join('');
+  document.getElementById('modal-edit-table-title').textContent = '➕ Nouvelle table';
+  openModal('modal-edit-table');
+}
+
+function openEditTable(tableId) {
+  const t = allTables.find(x => x.id === tableId);
+  if (!t) return;
+  document.getElementById('et-mode').value = 'edit';
+  document.getElementById('et-id').value = t.id;
+  document.getElementById('et-id-display').value = t.id;
+  document.getElementById('et-id-display').disabled = true;
+  document.getElementById('et-capacite').value = t.capacite || 2;
+  document.getElementById('et-description').value = t.description || '';
+  document.getElementById('et-active').value = t.active !== false ? 'true' : 'false';
+  document.getElementById('btn-delete-table').style.display = '';
+
+  // Populate zone select
+  const zonesSaved = JSON.parse(localStorage.getItem('bazar-zones') || 'null') || ZONES;
+  const zoneEl = document.getElementById('et-zone');
+  const currentZone = Object.entries(zonesSaved).find(([, ids]) => ids.includes(tableId))?.[0] || '';
+  zoneEl.innerHTML = Object.keys(zonesSaved).map(z =>
+    `<option value="${z}" ${z === currentZone ? 'selected' : ''}>${z}</option>`
+  ).join('') + `<option value="__new__">+ Nouvelle zone…</option>`;
+  document.getElementById('modal-edit-table-title').textContent = `⚙️ Table ${t.id}`;
+  openModal('modal-edit-table');
+}
+
+async function saveEditTable() {
+  const mode = document.getElementById('et-mode').value;
+  const id = mode === 'create'
+    ? document.getElementById('et-id-display').value.trim().toUpperCase()
+    : document.getElementById('et-id').value;
+  const capacite = parseInt(document.getElementById('et-capacite').value) || 2;
+  const description = document.getElementById('et-description').value.trim();
+  const active = document.getElementById('et-active').value === 'true';
+  const zone = document.getElementById('et-zone').value;
+
+  if (!id) { showToast('Erreur', 'L\'ID de la table est requis', 'error'); return; }
+
+  try {
+    if (mode === 'create') {
+      // Vérifier que l'ID n'existe pas déjà
+      if (allTables.find(t => t.id === id)) {
+        showToast('Erreur', `La table "${id}" existe déjà`, 'error'); return;
+      }
+      const { error } = await db.from('tables').insert({ id, capacite, description, active, restaurant_id: allTables[0]?.restaurant_id });
+      if (error) throw error;
+      showToast('Table créée ✓', `${id} — ${capacite} couverts`, 'success');
+    } else {
+      const { error } = await db.from('tables').update({ capacite, description, active }).eq('id', id);
+      if (error) throw error;
+      showToast('Table mise à jour ✓', `${id} — ${capacite} couverts`, 'success');
+    }
+
+    // Mettre à jour la zone dans localStorage
+    if (zone && zone !== '__new__') {
+      const zones = JSON.parse(localStorage.getItem('bazar-zones') || 'null') || JSON.parse(JSON.stringify(ZONES));
+      Object.keys(zones).forEach(z => { zones[z] = zones[z].filter(x => x !== id); });
+      if (!zones[zone]) zones[zone] = [];
+      if (!zones[zone].includes(id)) zones[zone].push(id);
+      localStorage.setItem('bazar-zones', JSON.stringify(zones));
+    }
+
+    closeModal('modal-edit-table');
+    await loadTables();
+    renderFloorPlan();
+  } catch(e) {
+    showToast('Erreur', e.message, 'error');
+  }
+}
+
+async function deleteTable() {
+  const id = document.getElementById('et-id').value;
+  if (!id) return;
+  const hasResas = allReservations.some(r => r.table_assignee === id && r.statut !== 'Annulée');
+  if (hasResas) {
+    showToast('Impossible', `La table ${id} a des réservations actives`, 'error');
+    return;
+  }
+  const ok = await confirmAction('Supprimer la table', `Supprimer définitivement la table ${id} ?`);
+  if (!ok) return;
+  try {
+    const { error } = await db.from('tables').delete().eq('id', id);
+    if (error) throw error;
+    // Retirer de localStorage zones
+    const zones = JSON.parse(localStorage.getItem('bazar-zones') || 'null') || JSON.parse(JSON.stringify(ZONES));
+    Object.keys(zones).forEach(z => { zones[z] = zones[z].filter(x => x !== id); });
+    localStorage.setItem('bazar-zones', JSON.stringify(zones));
+    closeModal('modal-edit-table');
+    showToast('Table supprimée', id, 'success');
+    await loadTables();
+    renderFloorPlan();
+  } catch(e) {
+    showToast('Erreur', e.message, 'error');
+  }
+}
+
+
+// ═══════════════════════════════════════════
+// 📊 CAPACITÉ DE SERVICE (MIDI/SOIR)
+// ═══════════════════════════════════════════
+function getCapacityConfig() {
+  return JSON.parse(localStorage.getItem('bazar-capacity') || '{"midi":40,"soir":40}');
+}
+
+function openCapacityConfig() {
+  const cfg = getCapacityConfig();
+  document.getElementById('cap-midi-max').value = cfg.midi;
+  document.getElementById('cap-soir-max').value = cfg.soir;
+  openModal('modal-capacity');
+}
+
+function saveCapacityConfig() {
+  const midi = parseInt(document.getElementById('cap-midi-max').value) || 40;
+  const soir = parseInt(document.getElementById('cap-soir-max').value) || 40;
+  localStorage.setItem('bazar-capacity', JSON.stringify({ midi, soir }));
+  closeModal('modal-capacity');
+  showToast('Capacité sauvegardée ✓', `Midi : ${midi} cvts · Soir : ${soir} cvts`, 'success');
+  updateCapacityBars();
+}
+
+function updateCapacityBars() {
+  const cfg = getCapacityConfig();
+  const now = new Date();
+  const active = allReservations.filter(r => r.statut !== 'Annulée' && r.statut !== 'No-show');
+
+  const midiResas = active.filter(r => { const h = parseInt((r.heure||'00:00').split(':')[0]); return h >= 11 && h < 16; });
+  const soirResas = active.filter(r => { const h = parseInt((r.heure||'00:00').split(':')[0]); return h >= 16; });
+
+  const midiCvts = midiResas.reduce((s,r) => s + (parseInt(r.nombre_personnes)||0), 0);
+  const soirCvts = soirResas.reduce((s,r) => s + (parseInt(r.nombre_personnes)||0), 0);
+
+  const midiPct = Math.min(Math.round((midiCvts / cfg.midi) * 100), 100);
+  const soirPct = Math.min(Math.round((soirCvts / cfg.soir) * 100), 100);
+
+  const midiBar = document.getElementById('cap-bar-midi');
+  const soirBar = document.getElementById('cap-bar-soir');
+  if (midiBar) { midiBar.style.width = midiPct + '%'; midiBar.classList.toggle('full', midiPct >= 90); }
+  if (soirBar) { soirBar.style.width = soirPct + '%'; soirBar.classList.toggle('full', soirPct >= 90); }
+  const midiPctEl = document.getElementById('cap-pct-midi');
+  const soirPctEl = document.getElementById('cap-pct-soir');
+  if (midiPctEl) midiPctEl.textContent = midiPct + '%';
+  if (soirPctEl) soirPctEl.textContent = soirPct + '%';
+
+  // Warning if full
+  if (midiPct >= 100) showToast('⚠️ Service Midi complet', `${midiCvts}/${cfg.midi} couverts`, 'error');
+  if (soirPct >= 100) showToast('⚠️ Service Soir complet', `${soirCvts}/${cfg.soir} couverts`, 'error');
+}
+
+// ═══════════════════════════════════════════
+// 🖨️ IMPRESSION FICHE DE SERVICE
+// ═══════════════════════════════════════════
+function printService() {
+  // Update print header
+  const d = new Date(selectedDate + 'T12:00:00');
+  const dateStr = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  document.getElementById('ph-date').textContent = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+  const active = allReservations.filter(r => r.statut !== 'Annulée');
+  const couverts = active.reduce((s,r) => s + (parseInt(r.nombre_personnes)||0), 0);
+  document.getElementById('ph-meta').textContent = `${active.length} réservation${active.length!==1?'s':''} · ${couverts} couvert${couverts!==1?'s':''}`;
+  window.print();
+}
+
+// ═══════════════════════════════════════════
+// ⬇️ EXPORT CSV
+// ═══════════════════════════════════════════
+function downloadCSV(filename, rows) {
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function csvEsc(v) { return '"' + (v||'').toString().replace(/"/g,'""') + '"'; }
+
+async function exportCSV(type) {
+  if (type === 'reservations') {
+    const { data } = await db.from('reservations').select('*').order('date_reservation,heure');
+    if (!data?.length) { showToast('Export vide', 'Aucune réservation à exporter', 'info'); return; }
+    const headers = ['ID','Date','Heure','Nom','Téléphone','Email','Personnes','Table','Statut','Notes'];
+    const rows = data.map(r => [r.id,r.date_reservation,(r.heure||'').slice(0,5),r.nom_client,r.telephone,r.email,r.nombre_personnes,r.table_assignee,r.statut,r.notes].map(csvEsc));
+    downloadCSV(`reservations_${new Date().toISOString().slice(0,10)}.csv`, [headers, ...rows]);
+    showToast('Export réussi ✓', `${data.length} réservations exportées`, 'success');
+  } else if (type === 'clients') {
+    const { data } = await db.from('clients').select('*').order('nom');
+    if (!data?.length) { showToast('Export vide', 'Aucun client à exporter', 'info'); return; }
+    const headers = ['ID','Nom','Téléphone','Email','VIP','Allergènes','Réservations','Couverts','Première visite','Dernière visite','Notes'];
+    const rows = data.map(c => [c.id,c.nom,c.telephone,c.email,c.vip?'Oui':'Non',c.allergenes,c.nb_reservations,c.nb_couverts,c.premiere_visite,c.derniere_visite,c.notes_internes].map(csvEsc));
+    downloadCSV(`clients_${new Date().toISOString().slice(0,10)}.csv`, [headers, ...rows]);
+    showToast('Export réussi ✓', `${data.length} clients exportés`, 'success');
+  }
+}
+
+// ═══════════════════════════════════════════
+// 📱 QR CODE
+// ═══════════════════════════════════════════
+const PUBLIC_FORM_URL = window.location.origin + window.location.pathname.replace('le-bazar-reservations.html','le-bazar-resa-publique.html');
+
+function showQRCode() {
+  openModal('modal-qr');
+  const input = document.getElementById('qr-url-input');
+  if (!input.value) input.value = PUBLIC_FORM_URL;
+  generateQR(input.value);
+}
+
+function generateQR(url) {
+  if (!url) return;
+  document.getElementById('qr-url').textContent = url;
+  const canvas = document.getElementById('qr-canvas');
+  QRCode.toCanvas(canvas, url, { width: 200, margin: 1, color: { dark: '#000', light: '#fff' } }, err => {
+    if (err) console.error(err);
+  });
+}
+
+function downloadQR() {
+  const canvas = document.getElementById('qr-canvas');
+  const a = document.createElement('a'); a.href = canvas.toDataURL('image/png'); a.download = 'qr-reservation-bazar.png';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+// ═══════════════════════════════════════════
+// 🚫 BLOCAGE CRÉNEAUX
+// ═══════════════════════════════════════════
+let blocages = JSON.parse(localStorage.getItem('bazar-blocages') || '[]');
+
+function openBlocagesModal() {
+  document.getElementById('bl-date-debut').value = selectedDate;
+  document.getElementById('bl-date-fin').value = selectedDate;
+  document.getElementById('bl-heure-debut').value = '';
+  document.getElementById('bl-heure-fin').value = '';
+  document.getElementById('bl-motif').value = '';
+  renderBlocages();
+  openModal('modal-blocages');
+}
+
+function saveBlocage() {
+  const debut = document.getElementById('bl-date-debut').value;
+  const fin   = document.getElementById('bl-date-fin').value;
+  if (!debut || !fin) { showToast('Champs manquants', 'Date début et fin obligatoires', 'error'); return; }
+  if (fin < debut) { showToast('Erreur', 'La date de fin doit être ≥ date début', 'error'); return; }
+  const b = {
+    id: Date.now(),
+    dateDebut: debut,
+    dateFin: fin,
+    heureDebut: document.getElementById('bl-heure-debut').value || null,
+    heureFin: document.getElementById('bl-heure-fin').value || null,
+    motif: document.getElementById('bl-motif').value.trim() || 'Fermeture',
+  };
+  blocages.push(b);
+  localStorage.setItem('bazar-blocages', JSON.stringify(blocages));
+  showToast('Blocage ajouté ✓', `${debut} → ${fin}`, 'success');
+  renderBlocages();
+}
+
+function deleteBlocage(id) {
+  blocages = blocages.filter(b => b.id !== id);
+  localStorage.setItem('bazar-blocages', JSON.stringify(blocages));
+  renderBlocages();
+}
+
+function renderBlocages() {
+  const el = document.getElementById('blocages-list');
+  // Clean old blocages
+  const today = todayISO();
+  blocages = blocages.filter(b => b.dateFin >= today);
+  localStorage.setItem('bazar-blocages', JSON.stringify(blocages));
+  if (!blocages.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0;">Aucun blocage actif</div>';
+    return;
+  }
+  el.innerHTML = blocages.map(b => `
+    <div class="blocage-item">
+      <div class="blocage-info">
+        <div class="blocage-label">${b.motif}</div>
+        <div class="blocage-sub">
+          ${b.dateDebut} → ${b.dateFin}
+          ${b.heureDebut && b.heureFin ? ` · ${b.heureDebut}–${b.heureFin}` : ''}
+        </div>
+      </div>
+      <button class="btn-del-blocage" onclick="deleteBlocage(${b.id})" title="Supprimer">✕</button>
+    </div>
+  `).join('');
+}
+
+function isDateBlocked(date, heure) {
+  return blocages.some(b => {
+    if (date < b.dateDebut || date > b.dateFin) return false;
+    if (b.heureDebut && b.heureFin && heure) {
+      return heure >= b.heureDebut && heure <= b.heureFin;
+    }
+    return true;
+  });
+}
+
+// ═══════════════════════════════════════════
+// 📊 STATS
+// ═══════════════════════════════════════════
+async function loadStats() {
+  const since = new Date(); since.setDate(since.getDate() - 13);
+  const sinceStr = since.toISOString().split('T')[0];
+
+  const [{ data: resas }, { data: clients }] = await Promise.all([
+    db.from('reservations').select('date_reservation,nombre_personnes,nom_client,telephone,statut').gte('date_reservation', sinceStr),
+    db.from('clients').select('nom,telephone,nb_reservations,nb_couverts').order('nb_reservations', { ascending: false }).limit(5)
+  ]);
+
+  // Restore saved ticket moyen
+  const saved = localStorage.getItem('bazar-ticket-moyen');
+  if (saved) { const el = document.getElementById('ticket-moyen'); if(el) el.value = saved; }
+
+  window._lastStatsResas   = resas || [];
+  window._lastStatsClients = clients || [];
+  renderStats(resas || [], clients || []);
+}
+
+function renderStats(resas, topClients) {
+  const noShows     = resas.filter(r => r.statut === 'No-show');
+  const active      = resas.filter(r => r.statut !== 'Annulée');
+  const totalResas  = active.length;
+  const totalCvts   = active.filter(r => r.statut !== 'No-show').reduce((s, r) => s + (parseInt(r.nombre_personnes)||0), 0);
+  const avgPerDay   = totalResas > 0 ? (totalCvts / 14).toFixed(1) : 0;
+  const totalTables = Object.values(ZONES).flat().length;
+  const maxDay      = totalTables * 2;
+  const txRemplissage = maxDay > 0 ? Math.round((totalResas / (14 * maxDay)) * 100) : 0;
+  const txNoShow    = totalResas > 0 ? Math.round((noShows.length / totalResas) * 100) : 0;
+  const ticketMoyen = parseFloat(document.getElementById('ticket-moyen')?.value || localStorage.getItem('bazar-ticket-moyen') || 35) || 35;
+  const caEstime    = (totalCvts * ticketMoyen).toLocaleString('fr-FR');
+
+  // KPIs
+  document.getElementById('stats-kpis').innerHTML = `
+    <div class="stats-kpi"><div class="stats-kpi-val">${totalResas}</div><div class="stats-kpi-label">Réservations (14j)</div></div>
+    <div class="stats-kpi"><div class="stats-kpi-val">${totalCvts}</div><div class="stats-kpi-label">Couverts (14j)</div></div>
+    <div class="stats-kpi"><div class="stats-kpi-val">${avgPerDay}</div><div class="stats-kpi-label">Couverts/jour moy.</div></div>
+    <div class="stats-kpi" style="border-left-color:var(--green)"><div class="stats-kpi-val" style="color:var(--green)">${txRemplissage}%</div><div class="stats-kpi-label">Taux remplissage</div></div>
+    <div class="stats-kpi" style="border-left-color:#c084fc"><div class="stats-kpi-val" style="color:#c084fc">${txNoShow}%</div><div class="stats-kpi-label">Taux no-show <span style="font-size:11px;font-weight:400">(${noShows.length})</span></div></div>
+    <div class="stats-kpi" style="border-left-color:#ffd700"><div class="stats-kpi-val" style="color:#ffd700">${caEstime} €</div><div class="stats-kpi-label">CA estimé (14j)</div></div>
+  `;
+
+  // Bar chart — couverts par jour sur 14 jours
+  const days = {};
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    days[d.toISOString().split('T')[0]] = 0;
+  }
+  resas.forEach(r => { if (days[r.date_reservation] !== undefined) days[r.date_reservation] += parseInt(r.nombre_personnes)||0; });
+  const vals = Object.values(days);
+  const maxVal = Math.max(...vals, 1);
+  const labels = Object.keys(days).map(d => {
+    const dt = new Date(d + 'T12:00:00');
+    return dt.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' });
+  });
+
+  const chartHtml = `
+    <div class="chart-wrap">
+      ${vals.map((v, i) => `
+        <div class="chart-col" title="${labels[i]} : ${v} couvert${v>1?'s':''}">
+          <div class="chart-bar-val">${v||''}</div>
+          <div class="chart-bar" style="height:${Math.max(v/maxVal*100,2)}%"></div>
+        </div>
+      `).join('')}
+    </div>
+    <div class="chart-labels">
+      ${labels.map(l => `<div class="chart-label-item">${l.split(' ')[0]}<br>${l.split(' ')[1]||''}</div>`).join('')}
+    </div>`;
+  document.getElementById('stats-chart-wrap').innerHTML = chartHtml;
+
+  // Top clients
+  const tcEl = document.getElementById('stats-top-clients').querySelector('tbody');
+  if (topClients.length === 0) {
+    tcEl.innerHTML = '<tr><td style="color:var(--muted);padding:16px 12px">Aucun client enregistré</td></tr>';
+  } else {
+    tcEl.innerHTML = topClients.map((c, i) => `
+      <tr>
+        <td><span class="rank-badge">${i+1}</span></td>
+        <td style="font-weight:600">${c.nom}</td>
+        <td style="color:var(--orange);font-weight:700">${c.nb_reservations} rés.</td>
+        <td style="color:var(--muted);font-size:12px">${c.nb_couverts} cvts</td>
+      </tr>`).join('');
+  }
+
+  // Top jours de la semaine
+  const byDow = {0:0,1:0,2:0,3:0,4:0,5:0,6:0};
+  resas.forEach(r => { const d = new Date(r.date_reservation+'T12:00:00'); byDow[d.getDay()] += parseInt(r.nombre_personnes)||0; });
+  const dowNames = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+  const sorted = Object.entries(byDow).sort((a,b) => b[1]-a[1]).slice(0,5);
+  const tdEl = document.getElementById('stats-top-days').querySelector('tbody');
+  tdEl.innerHTML = sorted.map(([dow, cvts], i) => `
+    <tr>
+      <td><span class="rank-badge">${i+1}</span></td>
+      <td style="font-weight:600">${dowNames[parseInt(dow)]}</td>
+      <td style="color:var(--orange);font-weight:700">${cvts} cvts</td>
+    </tr>`).join('');
+}
+
+/* ══════════════════════════════════════════
+   ANNULATIONS
+══════════════════════════════════════════ */
+let _annulKnownIds = null; // null = not yet initialised
+
+async function loadAnnulations() {
+  const tbody = document.getElementById('annul-tbody');
+  const empty = document.getElementById('annul-empty');
+  const label = document.getElementById('annul-count-label');
+  if (!db) return;
+  const { data, error } = await db
+    .from('reservations')
+    .select('*')
+    .eq('statut', 'Annulée')
+    .order('date_creation', { ascending: false });
+  if (error) { showToast('Erreur', 'Impossible de charger les annulations.', 'error'); return; }
+  const list = data || [];
+  label.textContent = `${list.length} annulation${list.length > 1 ? 's' : ''}`;
+  if (list.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  tbody.innerHTML = list.map(r => `
+    <tr>
+      <td><span class="annul-badge-id">${r.id || '—'}</span></td>
+      <td style="font-weight:600">${r.nom_client || '—'}</td>
+      <td style="color:var(--muted)">${r.telephone || '—'}</td>
+      <td>${r.date_reservation ? new Date(r.date_reservation+'T12:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}) : '—'}</td>
+      <td>${r.heure ? r.heure.substring(0,5) : '—'}</td>
+      <td style="text-align:center">${r.nombre_personnes || '—'}</td>
+      <td style="color:var(--muted)">${r.table_assignee || '—'}</td>
+      <td style="color:var(--muted);font-size:12px">${r.date_creation ? new Date(r.date_creation).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—'}</td>
+    </tr>`).join('');
+}
+
+function clearAnnulBadge() {
+  const badge = document.getElementById('annul-count-badge');
+  if (badge) { badge.style.display = 'none'; badge.textContent = ''; }
+}
+
+function closeAnnulNotif() {
+  document.getElementById('annul-notif').style.display = 'none';
+}
+
+// Poll for new cancellations every 30 s
+let _annulPollTimer = null;
+async function pollAnnulations() {
+  if (!db) return;
+  const { data } = await db
+    .from('reservations')
+    .select('id,nom_client,date_reservation,heure,nombre_personnes')
+    .eq('statut', 'Annulée')
+    .order('date_creation', { ascending: false })
+    .limit(50);
+  if (!data) return;
+  const ids = new Set(data.map(r => r.id));
+  if (_annulKnownIds === null) {
+    // First run — just store the current state
+    _annulKnownIds = ids;
+    return;
+  }
+  // Find IDs that weren't there before
+  const newOnes = data.filter(r => !_annulKnownIds.has(r.id));
+  if (newOnes.length > 0) {
+    // Update known set
+    ids.forEach(id => _annulKnownIds.add(id));
+    // Show badge on tab
+    const badge = document.getElementById('annul-count-badge');
+    if (badge) {
+      const prev = parseInt(badge.textContent) || 0;
+      badge.textContent = prev + newOnes.length;
+      badge.style.display = 'flex';
+    }
+    // Show notification for the most recent one
+    const r = newOnes[0];
+    const dateStr = r.date_reservation
+      ? new Date(r.date_reservation+'T12:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'long'})
+      : '';
+    document.getElementById('annul-notif-body').textContent = r.nom_client + (dateStr ? ' — ' + dateStr : '');
+    document.getElementById('annul-notif-sub').textContent =
+      (r.heure ? r.heure.substring(0,5) + ' · ' : '') +
+      (r.nombre_personnes ? r.nombre_personnes + ' pers.' : '') +
+      (newOnes.length > 1 ? ` (+${newOnes.length - 1} autre${newOnes.length > 2 ? 's' : ''})` : '');
+    const notif = document.getElementById('annul-notif');
+    notif.style.display = 'block';
+    // Auto-hide after 8 s
+    clearTimeout(notif._hideTimer);
+    notif._hideTimer = setTimeout(closeAnnulNotif, 8000);
+    // Clicking the notif opens the tab
+    notif.onclick = (e) => { if (e.target.classList.contains('annul-notif-close')) return; closeAnnulNotif(); switchTab('annulations'); };
+  }
+}
+
+// Start polling after login (hooked into initDashboard via setTimeout)
+function startAnnulPolling() {
+  pollAnnulations(); // immediate first check
+  _annulPollTimer = setInterval(pollAnnulations, 30000);
+}
+
+/* ══════════════════════════════════════════
+   COMMANDES
+══════════════════════════════════════════ */
+let _cmdKnownIds  = null;
+let _cmdFilter    = 'all';
+let _cmdCache     = [];
+
+async function loadCommandes() {
+  const board = document.getElementById('cmd-board');
+  const label = document.getElementById('cmd-count-label');
+  if (!db) return;
+  const { data, error } = await db
+    .from('commandes_salle')
+    .select('*, commandes_salle_items(*)')
+    .not('statut', 'eq', 'Archivé')
+    .order('created_at', { ascending: true });
+  if (error) { if (board) board.innerHTML = '<div style="color:var(--red);padding:20px">Erreur chargement commandes.</div>'; return; }
+  _cmdCache = (data || []).map(c => ({ ...c, items: c.commandes_salle_items || [] }));
+  if (label) label.textContent = _cmdCache.length + ' commande' + (_cmdCache.length > 1 ? 's' : '') + ' active' + (_cmdCache.length > 1 ? 's' : '');
+  renderCommandes();
+}
+
+function renderCommandes() {
+  const board = document.getElementById('cmd-board');
+  if (!board) return;
+  let list = _cmdCache;
+  if (_cmdFilter !== 'all') list = _cmdCache.filter(c => c.statut === _cmdFilter);
+
+  if (list.length === 0) {
+    board.innerHTML = '<div style="text-align:center;padding:60px 0;color:var(--muted)"><div style="font-size:36px;margin-bottom:12px">🍽️</div><div style="font-size:15px;font-weight:600;color:var(--text)">Aucune commande active</div><div style="margin-top:6px;font-size:13px">Les commandes des serveurs apparaissent ici en temps réel.</div></div>';
+    return;
+  }
+
+  board.innerHTML = list.map(c => {
+    const cls = c.statut === 'En attente' ? 'cmd-att' : c.statut === 'En préparation' ? 'cmd-prep' : c.statut === 'Prêt' ? 'cmd-pret' : '';
+    const time = c.created_at ? new Date(c.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '';
+    const itemsHTML = (c.items||[]).map(it =>
+      `<div class="cmd-item"><span>${it.nom}${it.notes ? ' <span style="font-size:10px;color:var(--orange);font-style:italic">↳ '+it.notes+'</span>' : ''}</span><span class="cmd-item-qty">×${it.quantite}</span></div>`
+    ).join('');
+    const btnPrep = c.statut === 'En attente'     ? `<button class="cmd-btn cmd-btn-prep" onclick="updateCmdStatut('${c.id}','En préparation')">▶ Prép.</button>` : '';
+    const btnPret = c.statut !== 'Prêt'           ? `<button class="cmd-btn cmd-btn-pret" onclick="updateCmdStatut('${c.id}','Prêt')">✓ Prêt</button>` : '';
+    const btnArch = `<button class="cmd-btn cmd-btn-arch" onclick="archiveCmd('${c.id}')">✕</button>`;
+    return `<div class="cmd-card ${cls}" id="cmdcard-${c.id}">
+      <div class="cmd-card-header">
+        <div><div class="cmd-table">${c.table_nom}</div><div class="cmd-meta">${c.serveur ? c.serveur+' · ' : ''}${time}</div></div>
+        <div class="cmd-pill">${c.statut}</div>
+      </div>
+      <div class="cmd-items">${itemsHTML}</div>
+      ${c.notes ? `<div style="margin:0 12px 8px;padding:6px 8px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-left:2px solid var(--muted);font-size:11px;color:var(--muted);font-style:italic">📝 ${c.notes}</div>` : ''}
+      <div class="cmd-footer">${btnPrep}${btnPret}${btnArch}</div>
+    </div>`;
+  }).join('');
+}
+
+async function updateCmdStatut(cmdId, newStatut) {
+  await db.from('commandes_salle').update({ statut: newStatut, updated_at: new Date().toISOString() }).eq('id', cmdId);
+  const c = _cmdCache.find(x => x.id === cmdId);
+  if (c) c.statut = newStatut;
+  renderCommandes();
+}
+
+async function archiveCmd(cmdId) {
+  await db.from('commandes_salle').update({ statut: 'Archivé', updated_at: new Date().toISOString() }).eq('id', cmdId);
+  _cmdCache = _cmdCache.filter(c => c.id !== cmdId);
+  renderCommandes();
+}
+
+function setCmdFilter(f) {
+  _cmdFilter = f;
+  const map = { all:'cmd-filter-all', 'En attente':'cmd-filter-att', 'En préparation':'cmd-filter-prep', 'Prêt':'cmd-filter-pret' };
+  ['cmd-filter-all','cmd-filter-att','cmd-filter-prep','cmd-filter-pret'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const isActive = map[f] === id;
+    el.style.background  = isActive ? 'var(--orange)' : 'transparent';
+    el.style.borderColor = isActive ? 'var(--orange)' : 'var(--border2)';
+    el.style.color       = isActive ? '#fff' : 'var(--muted)';
+  });
+  renderCommandes();
+}
+
+function clearCmdBadge() {
+  const badge = document.getElementById('cmd-count-badge');
+  if (badge) { badge.style.display = 'none'; badge.textContent = ''; }
+}
+
+function closeCmdNotif() {
+  const n = document.getElementById('cmd-notif');
+  if (n) n.style.display = 'none';
+}
+
+// Poll every 20s for new commandes
+let _cmdPollTimer = null;
+async function pollCommandes() {
+  if (!db) return;
+  const { data } = await db
+    .from('commandes_salle')
+    .select('id,table_nom,serveur,statut,created_at,commandes_salle_items(nom,quantite)')
+    .not('statut','eq','Archivé')
+    .order('created_at',{ascending:false})
+    .limit(50);
+  if (!data) return;
+  const ids = new Set(data.map(c => c.id));
+  if (_cmdKnownIds === null) { _cmdKnownIds = ids; return; }
+  const newOnes = data.filter(c => !_cmdKnownIds.has(c.id));
+  if (newOnes.length > 0) {
+    ids.forEach(id => _cmdKnownIds.add(id));
+    // Badge on tab
+    const badge = document.getElementById('cmd-count-badge');
+    if (badge) {
+      const prev = parseInt(badge.textContent) || 0;
+      badge.textContent = prev + newOnes.length;
+      badge.style.display = 'flex';
+    }
+    // Notif
+    const c = newOnes[0];
+    const itemNames = (c.commandes_salle_items||[]).map(i => i.nom + (i.quantite > 1 ? ' ×'+i.quantite : '')).join(', ');
+    document.getElementById('cmd-notif-body').textContent = 'Table ' + c.table_nom + (c.serveur ? ' · ' + c.serveur : '');
+    document.getElementById('cmd-notif-sub').textContent  = itemNames.substring(0,60) + (itemNames.length > 60 ? '…' : '') + (newOnes.length > 1 ? ` (+${newOnes.length-1} autre${newOnes.length>2?'s':''})` : '');
+    const notif = document.getElementById('cmd-notif');
+    if (notif) {
+      notif.style.display = 'block';
+      clearTimeout(notif._hideTimer);
+      notif._hideTimer = setTimeout(closeCmdNotif, 8000);
+      notif.onclick = (e) => { if (e.target.classList.contains('cmd-notif-close')) return; closeCmdNotif(); switchTab('commandes'); };
+    }
+    // Refresh if tab is open
+    if (document.getElementById('view-commandes')?.style.display !== 'none') loadCommandes();
+  }
+}
+
+function startCmdPolling() {
+  pollCommandes();
+  _cmdPollTimer = setInterval(pollCommandes, 20000);
+}
+</script>
+</body>
+</html>

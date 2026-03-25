@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Le Bazar — Réserver une table</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #000; --surface: #0d0d0d; --surface2: #161616;
+      --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
+      --text: #fff; --muted: #999;
+      --orange: #ff6614; --orange-dim: rgba(255,102,20,0.12);
+      --green: #4caf7d; --green-dim: rgba(76,175,125,0.10);
+      --red: #e05050;
+    }
+    html, body {
+      min-height: 100vh; background: var(--bg); color: var(--text);
+      font-family: 'Montserrat', Arial, sans-serif; font-size: 14px;
+      -webkit-font-smoothing: antialiased;
+    }
+    input, select, textarea, button { font-family: inherit; font-size: inherit; }
+
+    /* ── Header ── */
+    .pub-header {
+      padding: 32px 20px 24px; text-align: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .pub-logo { max-width: 120px; margin: 0 auto 12px; display: block; }
+    .pub-title { font-size: 22px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--orange); }
+    .pub-sub { color: var(--muted); font-size: 13px; margin-top: 6px; }
+
+    /* ── Card ── */
+    .pub-card {
+      max-width: 480px; margin: 32px auto; padding: 0 16px 40px;
+    }
+
+    /* ── Steps indicator ── */
+    .steps { display: flex; align-items: center; justify-content: center; gap: 0; margin-bottom: 32px; }
+    .step { display: flex; align-items: center; gap: 8px; }
+    .step-num {
+      width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; border: 1px solid var(--border2); color: var(--muted);
+      transition: all .3s;
+    }
+    .step.active .step-num { background: var(--orange); border-color: var(--orange); color: #fff; }
+    .step.done .step-num { background: var(--green); border-color: var(--green); color: #fff; }
+    .step-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+    .step.active .step-label { color: var(--orange); }
+    .step-sep { width: 32px; height: 1px; background: var(--border2); margin: 0 4px; }
+
+    /* ── Form ── */
+    .form-section { margin-bottom: 24px; }
+    .form-section-title {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: var(--orange);
+      font-weight: 700; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
+    }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-group { margin-bottom: 14px; }
+    label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; display: block; margin-bottom: 6px; font-weight: 600; }
+    input, select, textarea {
+      width: 100%; padding: 12px 14px; background: var(--surface2);
+      border: 1px solid var(--border2); color: var(--text); outline: none;
+      transition: border-color .2s; font-size: 14px;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--orange); }
+    input::placeholder, textarea::placeholder { color: rgba(255,255,255,0.25); }
+    select option { background: #1a1a1a; }
+    textarea { resize: vertical; min-height: 80px; }
+
+    /* ── Boutons ── */
+    .btn-primary {
+      width: 100%; padding: 16px; background: var(--orange); border: none; color: #fff;
+      font-size: 14px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+      cursor: pointer; transition: background .2s; margin-top: 8px;
+    }
+    .btn-primary:hover { background: #e5570f; }
+    .btn-primary:disabled { background: rgba(255,102,20,0.35); cursor: not-allowed; }
+    .btn-secondary {
+      padding: 12px 24px; background: transparent; border: 1px solid var(--border2);
+      color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s;
+    }
+    .btn-secondary:hover { border-color: var(--orange); color: var(--orange); }
+
+    /* ── Créneaux ── */
+    .slots-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .slot-btn {
+      padding: 10px 6px; background: var(--surface2); border: 1px solid var(--border2);
+      color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer; text-align: center;
+      transition: all .2s;
+    }
+    .slot-btn:hover { border-color: var(--orange); color: var(--orange); }
+    .slot-btn.selected { background: var(--orange); border-color: var(--orange); color: #fff; }
+    .slot-btn.disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+
+    /* ── Bloc bloqué ── */
+    .blocked-notice {
+      background: rgba(224,80,80,0.10); border: 1px solid rgba(224,80,80,0.3);
+      padding: 16px; text-align: center; color: var(--red); font-size: 13px;
+      margin-bottom: 16px;
+    }
+
+    /* ── Confirmation screen ── */
+    #screen-confirm { display: none; text-align: center; padding: 40px 0; }
+    .confirm-icon { font-size: 56px; margin-bottom: 20px; }
+    .confirm-title { font-size: 20px; font-weight: 700; letter-spacing: 2px; margin-bottom: 12px; color: var(--green); }
+    .confirm-msg { color: var(--muted); font-size: 14px; line-height: 1.7; }
+    .confirm-details {
+      background: var(--surface2); border: 1px solid var(--border2);
+      padding: 20px; margin: 24px 0; text-align: left;
+    }
+    .confirm-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .confirm-row:last-child { border-bottom: none; }
+    .confirm-row-label { color: var(--muted); }
+    .confirm-row-val { font-weight: 600; }
+
+    /* ── Error screen ── */
+    #screen-error { display: none; text-align: center; padding: 40px 0; }
+    #screen-error .confirm-title { color: var(--red); }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 32px; height: 32px; border: 3px solid rgba(255,102,20,0.2);
+      border-top-color: var(--orange); border-radius: 50%;
+      animation: spin .8s linear infinite; margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #screen-loading { display: none; text-align: center; padding: 60px 0; }
+    .loading-msg { color: var(--muted); font-size: 13px; margin-top: 8px; }
+
+    /* ── Info banner ── */
+    .info-banner {
+      background: var(--orange-dim); border: 1px solid rgba(255,102,20,0.3);
+      padding: 12px 16px; font-size: 12px; color: var(--orange); margin-bottom: 20px;
+    }
+
+    /* ── Personne selector ── */
+    .pax-selector { display: flex; align-items: center; gap: 0; }
+    .pax-btn {
+      width: 44px; height: 44px; background: var(--surface2); border: 1px solid var(--border2);
+      color: var(--text); font-size: 20px; cursor: pointer; display: flex; align-items: center;
+      justify-content: center; transition: all .2s; flex-shrink: 0;
+    }
+    .pax-btn:hover { border-color: var(--orange); color: var(--orange); }
+    .pax-num {
+      flex: 1; height: 44px; background: var(--surface2); border-top: 1px solid var(--border2);
+      border-bottom: 1px solid var(--border2); display: flex; align-items: center;
+      justify-content: center; font-size: 18px; font-weight: 700; min-width: 60px;
+    }
+
+    /* ── Footer ── */
+    .pub-footer { text-align: center; padding: 20px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--border); }
+    .pub-footer a { color: var(--orange); text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="pub-header">
+  <img src="logo-bazar.avif" class="pub-logo" alt="Le Bazar" onerror="this.style.display='none'">
+  <div class="pub-title">Le Bazar</div>
+  <div class="pub-sub">Réserver une table</div>
+</div>
+
+<div class="pub-card">
+
+  <!-- Steps -->
+  <div class="steps" id="steps-indicator">
+    <div class="step active" id="step1">
+      <div class="step-num">1</div>
+      <div class="step-label">Date</div>
+    </div>
+    <div class="step-sep"></div>
+    <div class="step" id="step2">
+      <div class="step-num">2</div>
+      <div class="step-label">Créneau</div>
+    </div>
+    <div class="step-sep"></div>
+    <div class="step" id="step3">
+      <div class="step-num">3</div>
+      <div class="step-label">Infos</div>
+    </div>
+  </div>
+
+  <!-- ═══ STEP 1 : Date & Personnes ═══ -->
+  <div id="screen-step1">
+    <div class="form-section">
+      <div class="form-section-title">📅 Quand souhaitez-vous venir ?</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Date *</label>
+          <input type="date" id="pub-date" required />
+        </div>
+        <div class="form-group">
+          <label>Personnes *</label>
+          <div class="pax-selector">
+            <button class="pax-btn" onclick="changePax(-1)">−</button>
+            <div class="pax-num" id="pax-display">2</div>
+            <button class="pax-btn" onclick="changePax(1)">+</button>
+          </div>
+          <input type="hidden" id="pub-pax" value="2" />
+        </div>
+      </div>
+    </div>
+    <div id="step1-blocked-notice" class="blocked-notice" style="display:none">
+      🚫 Le restaurant est fermé à cette date. Veuillez choisir une autre date.
+    </div>
+    <button class="btn-primary" onclick="goStep2()">Voir les créneaux disponibles →</button>
+  </div>
+
+  <!-- ═══ STEP 2 : Créneaux ═══ -->
+  <div id="screen-step2" style="display:none">
+    <div class="form-section">
+      <div class="form-section-title">⏰ Choisissez un créneau</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div style="font-size:13px;color:var(--muted)">
+          <span id="step2-date-display"></span> · <strong id="step2-pax-display"></strong>
+        </div>
+        <button class="btn-secondary" style="padding:6px 14px;font-size:11px;" onclick="backStep1()">‹ Modifier</button>
+      </div>
+
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:2px;font-weight:600;margin-bottom:8px;">🌞 Déjeuner</div>
+      <div class="slots-grid" id="slots-midi"></div>
+
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:2px;font-weight:600;margin:20px 0 8px;">🌙 Dîner</div>
+      <div class="slots-grid" id="slots-soir"></div>
+
+      <div id="no-slots-msg" style="display:none;text-align:center;padding:30px 0;color:var(--muted);">
+        Aucune disponibilité pour cette date. <a href="#" onclick="backStep1();return false" style="color:var(--orange)">Choisir une autre date</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ STEP 3 : Infos client ═══ -->
+  <div id="screen-step3" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <div class="info-banner" style="flex:1;margin-bottom:0;margin-right:12px;">
+        📅 <strong id="step3-recap"></strong>
+      </div>
+      <button class="btn-secondary" style="padding:8px 14px;font-size:11px;flex-shrink:0;" onclick="backStep2()">‹ Modifier</button>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">👤 Vos coordonnées</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Prénom & Nom *</label>
+          <input type="text" id="pub-nom" placeholder="Jean Dupont" required />
+        </div>
+        <div class="form-group">
+          <label>Téléphone *</label>
+          <input type="tel" id="pub-tel" placeholder="06 12 34 56 78" required />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="pub-email" placeholder="jean@email.fr" />
+      </div>
+      <div class="form-group">
+        <label>Occasion spéciale</label>
+        <select id="pub-occasion" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:12px 14px;font-size:13px;font-family:inherit;outline:none;appearance:none;">
+          <option value="">— Aucune —</option>
+          <option value="🎂 Anniversaire">🎂 Anniversaire</option>
+          <option value="💍 Fiançailles">💍 Fiançailles</option>
+          <option value="🎉 EVJF / EVG">🎉 EVJF / EVG</option>
+          <option value="💼 Repas d'affaires">💼 Repas d'affaires</option>
+          <option value="🍾 Autre occasion">🍾 Autre occasion</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Notes / Demandes spéciales</label>
+        <textarea id="pub-notes" placeholder="Allergies, chaise bébé, table vue terrasse…"></textarea>
+      </div>
+    </div>
+    <div id="step3-error" style="display:none;background:rgba(224,80,80,0.10);border:1px solid rgba(224,80,80,0.3);padding:12px 16px;color:var(--red);font-size:13px;margin-bottom:16px;"></div>
+    <button class="btn-primary" id="btn-confirm-resa" onclick="submitReservation()">✓ Confirmer ma réservation</button>
+    <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:12px;">
+      Vous recevrez un email de confirmation à l'adresse indiquée.
+    </div>
+  </div>
+
+  <!-- ═══ LOADING ═══ -->
+  <div id="screen-loading">
+    <div class="spinner"></div>
+    <div class="loading-msg">Vérification des disponibilités…</div>
+  </div>
+
+  <!-- ═══ CONFIRMATION ═══ -->
+  <div id="screen-confirm">
+    <div class="confirm-icon">🎉</div>
+    <div class="confirm-title">Réservation confirmée !</div>
+    <div class="confirm-msg">Votre table a bien été réservée au Bazar.<br>Un email de confirmation vous a été envoyé.</div>
+    <div class="confirm-details" id="confirm-details"></div>
+    <div class="confirm-msg" style="margin-top:8px;">
+      En cas d'empêchement, merci de nous prévenir au<br>
+      <a href="tel:+33600000000" style="color:var(--orange);font-weight:700;">06 00 00 00 00</a>
+    </div>
+    <button class="btn-primary" style="margin-top:24px;" onclick="resetForm()">Faire une nouvelle réservation</button>
+  </div>
+
+  <!-- ═══ ERREUR ═══ -->
+  <div id="screen-error">
+    <div class="confirm-icon">😕</div>
+    <div class="confirm-title" style="color:var(--red)">Plus de disponibilité</div>
+    <div class="confirm-msg" id="error-msg">Ce créneau n'est plus disponible.</div>
+    <button class="btn-primary" style="margin-top:32px;" onclick="backStep2()">‹ Choisir un autre créneau</button>
+  </div>
+
+</div>
+
+<div class="pub-footer">
+  25 Av. de l'Europe, 92300 Levallois-Perret · Tél. 01 47 58 00 73 · <a href="#">Mentions légales</a>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ══════════════════════════════════
+// ⚙️ CONFIG
+// ══════════════════════════════════
+const SUPABASE_URL      = 'https://gtjvsrhblqwwnviledmo.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd0anZzcmhibHF3d252aWxlZG1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNjk2NTYsImV4cCI6MjA4OTc0NTY1Nn0.Om-tFf8iIGsTXjWY4l95ApAF6hRP-s5ddsMco_0TPyM';
+const N8N_WEBHOOK_URL   = 'https://supportcn.app.n8n.cloud/webhook/reservation';
+
+// Créneaux disponibles
+const SLOTS_MIDI = ['12:00','12:15','12:30','12:45','13:00','13:15','13:30','13:45','14:00'];
+const SLOTS_SOIR = ['19:00','19:15','19:30','19:45','20:00','20:15','20:30','20:45','21:00','21:15','21:30'];
+
+// ══════════════════════════════════
+// 🔄 STATE
+// ══════════════════════════════════
+let db;
+let selectedDate = '';
+let selectedHeure = '';
+let selectedPax = 2;
+let existingResas = [];
+let allTables = [];
+
+// Blocages depuis localStorage (partagé avec backoffice)
+const blocages = JSON.parse(localStorage.getItem('bazar-blocages') || '[]');
+
+// ══════════════════════════════════
+// 🚀 INIT
+// ══════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  const { createClient } = supabase;
+  db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // Set min date to today
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('pub-date').min = today;
+  document.getElementById('pub-date').value = today;
+});
+
+// ══════════════════════════════════
+// PAX SELECTOR
+// ══════════════════════════════════
+function changePax(delta) {
+  selectedPax = Math.max(1, Math.min(20, selectedPax + delta));
+  document.getElementById('pax-display').textContent = selectedPax;
+  document.getElementById('pub-pax').value = selectedPax;
+}
+
+// ══════════════════════════════════
+// STEP 1 → 2
+// ══════════════════════════════════
+async function goStep2() {
+  selectedDate = document.getElementById('pub-date').value;
+  if (!selectedDate) { alert('Veuillez choisir une date.'); return; }
+
+  // Check if date is blocked
+  const today = new Date().toISOString().split('T')[0];
+  if (selectedDate < today) { alert('La date choisie est passée.'); return; }
+
+  if (isDateBlocked(selectedDate)) {
+    document.getElementById('step1-blocked-notice').style.display = '';
+    return;
+  }
+  document.getElementById('step1-blocked-notice').style.display = 'none';
+
+  showScreen('loading');
+  document.querySelector('.loading-msg').textContent = 'Vérification des disponibilités…';
+
+  try {
+    // Load tables and existing reservations for this date
+    const [{ data: tables }, { data: resas }] = await Promise.all([
+      db.from('tables').select('id,capacite,active').eq('active', true),
+      db.from('reservations').select('heure,nombre_personnes,table_assignee,statut').eq('date_reservation', selectedDate).neq('statut','Annulée')
+    ]);
+    allTables = tables || [];
+    existingResas = resas || [];
+
+    // Update displays
+    const d = new Date(selectedDate + 'T12:00:00');
+    const dateStr = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+    document.getElementById('step2-date-display').textContent = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+    document.getElementById('step2-pax-display').textContent = selectedPax + ' personne' + (selectedPax > 1 ? 's' : '');
+
+    renderSlots();
+    showScreen('step2');
+    setStep(2);
+  } catch(e) {
+    showError('Erreur de connexion. Veuillez réessayer.');
+  }
+}
+
+// ══════════════════════════════════
+// RENDER CRÉNEAUX
+// ══════════════════════════════════
+function renderSlots() {
+  const midiEl = document.getElementById('slots-midi');
+  const soirEl = document.getElementById('slots-soir');
+
+  let hasMidi = false, hasSoir = false;
+
+  midiEl.innerHTML = SLOTS_MIDI.map(h => slotButton(h, () => hasMidi = true)).join('');
+  soirEl.innerHTML = SLOTS_SOIR.map(h => slotButton(h, () => hasSoir = true)).join('');
+
+  // Check if any available
+  const allDisabled = midiEl.querySelectorAll('.slot-btn:not(.disabled)').length === 0
+                   && soirEl.querySelectorAll('.slot-btn:not(.disabled)').length === 0;
+  document.getElementById('no-slots-msg').style.display = allDisabled ? '' : 'none';
+}
+
+function slotButton(heure, onAvailable) {
+  const available = hasAvailableTable(heure);
+  if (available) typeof onAvailable === 'function' && onAvailable();
+  return `<button class="slot-btn ${available ? '' : 'disabled'}" onclick="selectSlot('${heure}')">${heure}</button>`;
+}
+
+function hasAvailableTable(heure) {
+  // Tables occupied at this time (±1h window)
+  const occupied = new Set(existingResas.filter(r => {
+    const diff = Math.abs(timeToMins(r.heure) - timeToMins(heure));
+    return diff < 90;
+  }).map(r => r.table_assignee));
+
+  return allTables.some(t => {
+    if (occupied.has(t.id)) return false;
+    return (parseInt(t.capacite) || 2) >= selectedPax;
+  });
+}
+
+function timeToMins(t) {
+  const [h, m] = (t||'00:00').split(':').map(Number);
+  return h * 60 + m;
+}
+
+function selectSlot(heure) {
+  selectedHeure = heure;
+  document.querySelectorAll('.slot-btn').forEach(b => b.classList.remove('selected'));
+  event.target.classList.add('selected');
+  setTimeout(() => goStep3(), 300);
+}
+
+// ══════════════════════════════════
+// STEP 2 → 3
+// ══════════════════════════════════
+function goStep3() {
+  if (!selectedHeure) { alert('Veuillez choisir un créneau.'); return; }
+  const d = new Date(selectedDate + 'T12:00:00');
+  const dateStr = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+  document.getElementById('step3-recap').textContent =
+    `${dateStr.charAt(0).toUpperCase() + dateStr.slice(1)} à ${selectedHeure} · ${selectedPax} pers.`;
+  showScreen('step3');
+  setStep(3);
+}
+
+// ══════════════════════════════════
+// SUBMIT
+// ══════════════════════════════════
+async function submitReservation() {
+  const nom   = document.getElementById('pub-nom').value.trim();
+  const tel   = document.getElementById('pub-tel').value.trim();
+  const email = document.getElementById('pub-email').value.trim();
+  const notes = document.getElementById('pub-notes').value.trim();
+
+  const errEl = document.getElementById('step3-error');
+  if (!nom)  { errEl.textContent = 'Veuillez indiquer votre nom.'; errEl.style.display = ''; return; }
+  if (!tel)  { errEl.textContent = 'Veuillez indiquer votre téléphone.'; errEl.style.display = ''; return; }
+  errEl.style.display = 'none';
+
+  const btn = document.getElementById('btn-confirm-resa');
+  btn.disabled = true; btn.textContent = 'Envoi en cours…';
+  showScreen('loading');
+  document.querySelector('.loading-msg').textContent = 'Enregistrement de votre réservation…';
+
+  try {
+    const cancelToken = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
+    const occasion = document.getElementById('pub-occasion').value;
+    const payload = {
+      nom_client: nom, telephone: tel, email, notes, occasion,
+      date: selectedDate, heure: selectedHeure,
+      nombre_personnes: selectedPax,
+      cancel_token: cancelToken,
+    };
+
+    const res = await fetch(N8N_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Erreur');
+
+    // Show confirmation
+    const d = new Date(selectedDate + 'T12:00:00');
+    document.getElementById('confirm-details').innerHTML = `
+      <div class="confirm-row"><span class="confirm-row-label">Nom</span><span class="confirm-row-val">${nom}</span></div>
+      <div class="confirm-row"><span class="confirm-row-label">Date</span><span class="confirm-row-val">${d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</span></div>
+      <div class="confirm-row"><span class="confirm-row-label">Heure</span><span class="confirm-row-val">${selectedHeure}</span></div>
+      <div class="confirm-row"><span class="confirm-row-label">Personnes</span><span class="confirm-row-val">${selectedPax}</span></div>
+      ${json.table ? `<div class="confirm-row"><span class="confirm-row-label">Table</span><span class="confirm-row-val">${json.table}</span></div>` : ''}
+      ${email ? `<div class="confirm-row"><span class="confirm-row-label">Email</span><span class="confirm-row-val">${email}</span></div>` : ''}
+    `;
+    showScreen('confirm');
+    setStep(3, true);
+  } catch(e) {
+    document.getElementById('error-msg').textContent = e.message || 'Une erreur est survenue. Veuillez réessayer.';
+    showScreen('error');
+    btn.disabled = false;
+    btn.textContent = '✓ Confirmer ma réservation';
+  }
+}
+
+// ══════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════
+function backStep1() { showScreen('step1'); setStep(1); }
+function backStep2() { showScreen('step2'); setStep(2); }
+
+function showScreen(name) {
+  ['step1','step2','step3','loading','confirm','error'].forEach(s => {
+    document.getElementById('screen-' + s).style.display = s === name ? 'block' : 'none';
+  });
+}
+
+function setStep(n, done = false) {
+  [1,2,3].forEach(i => {
+    const el = document.getElementById('step' + i);
+    el.classList.remove('active','done');
+    if (done && i <= n) el.classList.add('done');
+    else if (i < n) el.classList.add('done');
+    else if (i === n) el.classList.add('active');
+  });
+}
+
+function resetForm() {
+  selectedDate = ''; selectedHeure = ''; selectedPax = 2;
+  document.getElementById('pub-nom').value = '';
+  document.getElementById('pub-tel').value = '';
+  document.getElementById('pub-email').value = '';
+  document.getElementById('pub-occasion').value = '';
+  document.getElementById('pub-notes').value = '';
+  document.getElementById('pax-display').textContent = '2';
+  document.getElementById('pub-pax').value = '2';
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('pub-date').value = today;
+  showScreen('step1');
+  setStep(1);
+}
+
+function showError(msg) {
+  document.getElementById('error-msg').textContent = msg;
+  showScreen('error');
+}
+
+function isDateBlocked(date) {
+  return blocages.some(b => date >= b.dateDebut && date <= b.dateFin);
+}
+</script>
+</body>
+</html>
