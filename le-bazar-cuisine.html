@@ -323,6 +323,7 @@ async function updateStatut(cmdId, newStatut) {
   await db.from('commandes_salle').update({ statut: newStatut, updated_at: new Date().toISOString() }).eq('id', cmdId);
   const c = commandes.find(x => x.id === cmdId);
   if (c) c.statut = newStatut;
+  if (newStatut === 'Prêt') playPretSound();
   renderBoard();
 }
 
@@ -380,17 +381,41 @@ function printTicket(cmdId) {
   window.print();
 }
 
-// ── BELL ──────────────────────────────────
+// ── BELL (nouvelle commande) ───────────────
 function playBell() {
   try {
     const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain); gain.connect(ctx.destination);
-    osc.type = 'sine'; osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.4, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
-    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.8);
+    // Double ping pour signaler une nouvelle commande
+    [0, 0.22].forEach(t => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine'; osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0, ctx.currentTime + t);
+      gain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + t + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.20);
+      osc.start(ctx.currentTime + t); osc.stop(ctx.currentTime + t + 0.24);
+    });
+  } catch(e) {}
+}
+
+// ── FANFARE (commande prête) ───────────────
+function playPretSound() {
+  try {
+    const ctx = new AudioContext();
+    // Montée joyeuse C5-E5-G5-C6
+    [523, 659, 784, 1047].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.11);
+      gain.gain.linearRampToValueAtTime(0.22, ctx.currentTime + i * 0.11 + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.11 + 0.22);
+      osc.start(ctx.currentTime + i * 0.11);
+      osc.stop(ctx.currentTime + i * 0.11 + 0.26);
+    });
   } catch(e) {}
 }
 
