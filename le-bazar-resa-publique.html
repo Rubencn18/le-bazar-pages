@@ -334,6 +334,7 @@ let selectedHeure = '';
 let selectedPax = 2;
 let existingResas = [];
 let allTables = [];
+let _submitting = false; // verrou anti-double-envoi
 
 // Blocages depuis localStorage (partagé avec backoffice)
 const blocages = JSON.parse(localStorage.getItem('bazar-blocages') || '[]');
@@ -479,6 +480,8 @@ async function submitReservation() {
   if (!tel)  { errEl.textContent = 'Veuillez indiquer votre téléphone.'; errEl.style.display = ''; return; }
   errEl.style.display = 'none';
 
+  if (_submitting) return; // protection double-clic
+  _submitting = true;
   const btn = document.getElementById('btn-confirm-resa');
   btn.disabled = true; btn.textContent = 'Envoi en cours…';
   showScreen('loading');
@@ -519,6 +522,7 @@ async function submitReservation() {
     showScreen('error');
     btn.disabled = false;
     btn.textContent = '✓ Confirmer ma réservation';
+    _submitting = false; // réinitialiser en cas d'erreur pour permettre de réessayer
   }
 }
 
