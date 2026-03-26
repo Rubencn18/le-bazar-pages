@@ -78,34 +78,34 @@
       display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;
       align-content:start;
     }
-    @keyframes card-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-    @keyframes spin-border{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+    @property --angle{syntax:'<angle>';initial-value:0deg;inherits:false}
+    @keyframes card-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes border-spin{to{--angle:360deg}}
 
     .item-card{
-      position:relative;overflow:hidden;
+      background:var(--surface2);border:1px solid var(--border);
       padding:14px 12px;cursor:pointer;border-radius:8px;
-      display:flex;flex-direction:column;gap:4px;
+      display:flex;flex-direction:column;gap:4px;position:relative;
       animation:card-in .25s ease both;
-      transform-origin:center;transition:transform .2s,box-shadow .2s;
+      transition:transform .2s,box-shadow .2s;
     }
-    /* Bordure rotative via ::before — derrière tout */
-    .item-card::before{
-      content:'';position:absolute;
-      width:150%;height:150%;top:-25%;left:-25%;
-      background:conic-gradient(transparent 0deg,transparent 200deg,var(--orange) 250deg,#ff9500 280deg,transparent 320deg);
-      opacity:0;transition:opacity .3s;z-index:1;
+    .item-card:hover{
+      transform:scale(1.02);
+      border-color:transparent;
+      background-image:linear-gradient(var(--surface3),var(--surface3)),
+        conic-gradient(from var(--angle),transparent 30%,var(--orange) 45%,#ff9500 55%,var(--orange) 65%,transparent 80%);
+      background-origin:border-box;background-clip:padding-box,border-box;
+      animation:card-in .25s ease both,border-spin 2s linear infinite;
+      box-shadow:0 4px 20px rgba(255,102,20,0.2);
     }
-    /* Fond de la carte via ::after — au-dessus de la bordure */
-    .item-card::after{
-      content:'';position:absolute;inset:1px;border-radius:7px;
-      background:var(--surface2);z-index:2;transition:background .2s;
+    .item-card.in-cart{
+      border-color:transparent;
+      background-image:linear-gradient(var(--orange-dim),var(--orange-dim)),
+        conic-gradient(from var(--angle),transparent 30%,var(--orange) 45%,#ff9500 55%,var(--orange) 65%,transparent 80%);
+      background-origin:border-box;background-clip:padding-box,border-box;
+      animation:border-spin 1.5s linear infinite;
+      box-shadow:0 0 16px rgba(255,102,20,0.35);
     }
-    /* Contenu — au-dessus du fond */
-    .item-card > *{position:relative;z-index:3;}
-    .item-card:hover{transform:scale(1.02);box-shadow:0 6px 24px rgba(255,102,20,0.18)}
-    .item-card:hover::before{opacity:1;animation:spin-border 2s linear infinite}
-    .item-card.in-cart::before{opacity:1;animation:spin-border 1.5s linear infinite}
-    .item-card.in-cart::after{background:var(--orange-dim)}
     .item-card.dispo-false{opacity:.4;cursor:not-allowed}
 
     .item-emoji{font-size:22px;margin-bottom:4px}
