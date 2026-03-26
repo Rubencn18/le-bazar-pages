@@ -59,7 +59,14 @@
       background:var(--surface);border:1px solid var(--border);
       width:280px;flex-shrink:0;display:flex;flex-direction:column;
       position:relative;overflow:hidden;
+      transition:border-color .3s, box-shadow .3s;
     }
+    .ticket.statut-en-attente   { box-shadow:0 0 12px rgba(255,102,20,0.1); }
+    .ticket.statut-en-preparation { box-shadow:0 0 12px rgba(245,197,24,0.1); }
+    .ticket.statut-pret         { box-shadow:0 0 16px rgba(76,175,125,0.2); }
+    @media(max-width:640px){ .ticket{ width:100%; } }
+    .btn-statut { transition:all .15s; }
+    .btn-statut:active { transform:scale(0.96); }
     .ticket::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
     .ticket.statut-en-attente::before{background:var(--orange)}
     .ticket.statut-en-preparation::before{background:var(--yellow)}
@@ -121,9 +128,11 @@
     }
     .btn-archive:hover{border-color:var(--red);color:var(--red)}
     .ticket-time{
-      position:absolute;bottom:0;right:0;
-      font-size:9px;color:var(--muted);padding:3px 6px;letter-spacing:.5px;
+      font-size:10px;font-weight:600;font-variant-numeric:tabular-nums;
+      padding:3px 8px;border-radius:4px;background:var(--surface3);letter-spacing:.5px;
     }
+    .ticket-time.warn   { color:var(--yellow);background:var(--yellow-dim); }
+    .ticket-time.urgent { color:var(--red);background:rgba(224,80,80,0.15); }
 
     /* ── TOAST ── */
     #toast{
@@ -230,7 +239,7 @@ async function loadCommandes() {
 // ── REALTIME ──────────────────────────────
 function subscribeRealtime() {
   db.channel('cuisine-live')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'commandes' }, async payload => {
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'commandes_salle' }, async payload => {
       await loadCommandes();
       if (payload.eventType === 'INSERT') {
         playBell();
@@ -245,6 +254,29 @@ function subscribeRealtime() {
         status === 'SUBSCRIBED' ? 'var(--green)' : 'var(--muted)';
     });
 }
+
+// ── TIMER LIVE ────────────────────────────
+function elapsedLabel(created_at) {
+  const secs = Math.floor((Date.now() - new Date(created_at)) / 1000);
+  const m = Math.floor(secs / 60), s = secs % 60;
+  return m > 0 ? `${m}min ${String(s).padStart(2,'0')}s` : `${s}s`;
+}
+
+function elapsedClass(created_at) {
+  const secs = (Date.now() - new Date(created_at)) / 1000;
+  if (secs > 900) return 'urgent';
+  if (secs > 480) return 'warn';
+  return '';
+}
+
+setInterval(() => {
+  commandes.forEach(c => {
+    const el = document.getElementById('timer-' + c.id);
+    if (!el) return;
+    el.textContent = elapsedLabel(c.created_at);
+    el.className = 'ticket-time ' + elapsedClass(c.created_at);
+  });
+}, 5000);
 
 // ── RENDER ────────────────────────────────
 function renderBoard() {
@@ -305,7 +337,10 @@ function ticketHTML(c) {
         <div class="ticket-table">${c.table_nom}</div>
         <div class="ticket-meta">${c.serveur ? c.serveur + ' · ' : ''}${time}</div>
       </div>
-      <div class="ticket-status-pill">${c.statut}</div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">
+        <div class="ticket-status-pill">${c.statut}</div>
+        <div class="ticket-time" id="timer-${c.id}">${elapsedLabel(c.created_at)}</div>
+      </div>
     </div>
     <div class="ticket-items">${itemsHTML}</div>
     ${noteHTML}
@@ -320,11 +355,13 @@ function ticketHTML(c) {
 
 // ── ACTIONS ───────────────────────────────
 async function updateStatut(cmdId, newStatut) {
-  await db.from('commandes_salle').update({ statut: newStatut, updated_at: new Date().toISOString() }).eq('id', cmdId);
+  // Optimistic update — immédiat côté UI
   const c = commandes.find(x => x.id === cmdId);
   if (c) c.statut = newStatut;
   if (newStatut === 'Prêt') playPretSound();
   renderBoard();
+  // Puis synchro Supabase en arrière-plan
+  db.from('commandes_salle').update({ statut: newStatut, updated_at: new Date().toISOString() }).eq('id', cmdId);
 }
 
 async function archiveCmd(cmdId) {
