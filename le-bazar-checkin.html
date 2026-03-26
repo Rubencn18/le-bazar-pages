@@ -162,17 +162,24 @@ function formatDate(d) {
 
 async function init() {
   const params = new URLSearchParams(location.search);
-  const id = params.get('id');
+  const id    = params.get('id');
+  const token = params.get('token');
   const content = document.getElementById('content');
 
-  if (!id) {
+  if (!id && !token) {
     showSearchMode(content);
     return;
   }
 
   let resas;
   try {
-    resas = await sbFetch(`reservations?id=eq.${encodeURIComponent(id)}&select=*`);
+    if (token) {
+      // Lien QR code du mail de confirmation → recherche par cancel_token
+      resas = await sbFetch(`reservations?cancel_token=eq.${encodeURIComponent(token)}&select=*`);
+    } else {
+      // Lien direct avec l'ID
+      resas = await sbFetch(`reservations?id=eq.${encodeURIComponent(id)}&select=*`);
+    }
   } catch(e) {
     content.innerHTML = `<p style="color:var(--red)">Erreur : ${e.message}</p>`;
     return;
