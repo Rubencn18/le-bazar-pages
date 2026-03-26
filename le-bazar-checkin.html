@@ -405,22 +405,34 @@ function loadScript(src) {
 
 function handleScanned(data) {
   stopScanner();
-  // Extract token/id from the scanned URL
+  const raw = (data || '').trim();
+
+  // 1. URL complète avec ?token= ou ?id=
   try {
-    const url = new URL(data);
+    const url = new URL(raw);
     const token = url.searchParams.get('token');
     const id    = url.searchParams.get('id');
-    if (token || id) {
-      window.location.href = data;
-      return;
-    }
+    if (token || id) { window.location.href = raw; return; }
   } catch(_) {}
-  // Unrecognized QR — show search mode with error
+
+  // 2. ID brut type RES-XXXXXXXX-XXX
+  if (/^RES-/i.test(raw)) {
+    window.location.href = `le-bazar-checkin.html?id=${encodeURIComponent(raw)}`;
+    return;
+  }
+
+  // 3. UUID brut (cancel_token)
+  if (/^[0-9a-f-]{36}$/i.test(raw)) {
+    window.location.href = `le-bazar-checkin.html?token=${encodeURIComponent(raw)}`;
+    return;
+  }
+
+  // Non reconnu
   const content = document.getElementById('content');
   showSearchMode(content);
   setTimeout(() => {
     const r = document.getElementById('search-results');
-    if (r) r.innerHTML = `<p class="no-results" style="color:var(--red)">QR non reconnu.<br><small style="word-break:break-all">${data}</small></p>`;
+    if (r) r.innerHTML = `<p class="no-results" style="color:var(--red)">QR non reconnu.<br><small style="word-break:break-all">${raw}</small></p>`;
   }, 30);
 }
 
