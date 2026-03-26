@@ -123,6 +123,42 @@
 
   footer { margin-top: 20px; color: var(--muted); font-size: 0.72rem; }
 
+  /* Scanner QR */
+  .scan-btn {
+    width: 100%; padding: 14px; border: 2px solid var(--brand);
+    border-radius: 10px; font-size: 1rem; font-weight: 700;
+    cursor: pointer; background: rgba(255,102,20,0.1); color: var(--brand);
+    transition: all .2s; letter-spacing: 0.5px; margin-bottom: 14px;
+  }
+  .scan-btn:hover { background: rgba(255,102,20,0.2); }
+  .divider { text-align: center; color: var(--muted); font-size: 0.72rem;
+    letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 14px; }
+  .scanner-wrap {
+    position: relative; border-radius: 12px; overflow: hidden;
+    background: #000; margin-bottom: 12px;
+  }
+  .scanner-wrap video { width: 100%; display: block; max-height: 280px; object-fit: cover; }
+  .scanner-overlay {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+  .scanner-frame {
+    width: 55%; aspect-ratio: 1;
+    border: 2.5px solid var(--brand); border-radius: 10px;
+    box-shadow: 0 0 0 2000px rgba(0,0,0,0.45);
+    animation: pulse-frame 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse-frame { 0%,100%{opacity:1} 50%{opacity:.6} }
+  .scanner-hint { color: var(--muted); font-size: 0.78rem; text-align: center; margin-bottom: 10px; }
+  .btn-cancel {
+    width: 100%; padding: 11px; background: transparent;
+    border: 1px solid var(--border); border-radius: 8px;
+    color: var(--muted); font-size: 0.9rem; font-weight: 600;
+    cursor: pointer; transition: all .2s;
+  }
+  .btn-cancel:hover { border-color: var(--text); color: var(--text); }
+
   @media (max-width: 440px) {
     body { padding: 12px; }
     .card { padding: 24px 18px; border-radius: 12px; }
@@ -286,6 +322,8 @@ function todayISO() {
 
 function showSearchMode(content) {
   content.innerHTML = `
+    <button class="scan-btn" onclick="startScanner()">📷 Scanner le QR code client</button>
+    <div class="divider">— ou rechercher manuellement —</div>
     <div class="search-form">
       <label class="search-label" for="search-input">Nom ou téléphone du client</label>
       <input id="search-input" class="search-input" type="text" placeholder="ex: Dupont ou 06 12 34 56 78" autocomplete="off" />
@@ -295,7 +333,95 @@ function showSearchMode(content) {
   document.getElementById('search-input').addEventListener('keydown', e => {
     if (e.key === 'Enter') searchResa();
   });
-  document.getElementById('search-input').focus();
+}
+
+/* ── QR Scanner ── */
+let _scanStream = null;
+let _scanTimer  = null;
+
+async function startScanner() {
+  const content = document.getElementById('content');
+  content.innerHTML = `
+    <div class="scanner-wrap" id="scanner-wrap">
+      <video id="scan-video" autoplay playsinline muted></video>
+      <div class="scanner-overlay"><div class="scanner-frame"></div></div>
+    </div>
+    <p class="scanner-hint">Pointez la caméra sur le QR code du client</p>
+    <button class="btn-cancel" onclick="stopScanner(); showSearchMode(document.getElementById('content'))">✕ Annuler</button>`;
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' } }
+    });
+    _scanStream = stream;
+    const video = document.getElementById('scan-video');
+    video.srcObject = stream;
+    await video.play();
+
+    if ('BarcodeDetector' in window) {
+      const detector = new BarcodeDetector({ formats: ['qr_code'] });
+      _scanTimer = setInterval(async () => {
+        try {
+          const codes = await detector.detect(video);
+          if (codes.length > 0) handleScanned(codes[0].rawValue);
+        } catch(_) {}
+      }, 350);
+    } else {
+      // Fallback: jsQR
+      await loadScript('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js');
+      const canvas = Object.assign(document.createElement('canvas'), {});
+      const ctx = canvas.getContext('2d');
+      _scanTimer = setInterval(() => {
+        if (!video.videoWidth) return;
+        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(img.data, img.width, img.height);
+        if (code) handleScanned(code.data);
+      }, 350);
+    }
+  } catch(e) {
+    content.innerHTML = `
+      <div class="icon-big">📵</div>
+      <p class="state-title" style="color:var(--red)">Caméra inaccessible</p>
+      <p class="state-sub">${e.message}</p>
+      <button class="search-btn" style="margin-top:16px" onclick="showSearchMode(document.getElementById('content'))">← Retour</button>`;
+  }
+}
+
+function stopScanner() {
+  if (_scanTimer)  { clearInterval(_scanTimer); _scanTimer = null; }
+  if (_scanStream) { _scanStream.getTracks().forEach(t => t.stop()); _scanStream = null; }
+}
+
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    if (document.querySelector(`script[src="${src}"]`)) { res(); return; }
+    const s = document.createElement('script');
+    s.src = src; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
+function handleScanned(data) {
+  stopScanner();
+  // Extract token/id from the scanned URL
+  try {
+    const url = new URL(data);
+    const token = url.searchParams.get('token');
+    const id    = url.searchParams.get('id');
+    if (token || id) {
+      window.location.href = data;
+      return;
+    }
+  } catch(_) {}
+  // Unrecognized QR — show search mode with error
+  const content = document.getElementById('content');
+  showSearchMode(content);
+  setTimeout(() => {
+    const r = document.getElementById('search-results');
+    if (r) r.innerHTML = `<p class="no-results" style="color:var(--red)">QR non reconnu.<br><small style="word-break:break-all">${data}</small></p>`;
+  }, 30);
 }
 
 async function searchResa() {
