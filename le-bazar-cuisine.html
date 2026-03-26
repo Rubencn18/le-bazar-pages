@@ -542,17 +542,24 @@ function closeStocks() {
   document.getElementById('stock-overlay').classList.remove('open');
 }
 
+async function supa(path) {
+  const r = await fetch(`${SUPA_URL}/rest/v1/${path}`, {
+    headers: { 'apikey': SUPA_ANON, 'Authorization': `Bearer ${SUPA_ANON}` }
+  });
+  return r.ok ? r.json() : [];
+}
+
 async function reloadStocksData() {
-  const [menuRes, ingrRes, linkRes] = await Promise.all([
+  const [menuRes, ingrData, linkData] = await Promise.all([
     db.from('menu').select('id,nom,categorie,disponible').order('categorie').order('ordre'),
-    db.from('ingredients').select('id,nom,disponible').order('nom'),
-    db.from('menu_ingredients').select('menu_id,ingredient_id')
+    supa('ingredients?select=id,nom,disponible&order=nom'),
+    supa('menu_ingredients?select=menu_id,ingredient_id')
   ]);
   allMenuItems   = menuRes.data || [];
-  allIngredients = ingrRes.data || [];
+  allIngredients = ingrData || [];
   menuIngredientMap = {};
   itemIngredientMap = {};
-  (linkRes.data || []).forEach(({ menu_id, ingredient_id }) => {
+  (linkData || []).forEach(({ menu_id, ingredient_id }) => {
     if (!menuIngredientMap[ingredient_id]) menuIngredientMap[ingredient_id] = [];
     menuIngredientMap[ingredient_id].push(menu_id);
     if (!itemIngredientMap[menu_id]) itemIngredientMap[menu_id] = [];
@@ -618,7 +625,11 @@ async function toggleIngredient(ingrId, disponible) {
     }
   });
   renderStocks();
-  await db.from('ingredients').update({ disponible }).eq('id', ingrId);
+  await fetch(`${SUPA_URL}/rest/v1/ingredients?id=eq.${ingrId}`, {
+    method: 'PATCH',
+    headers: { 'apikey': SUPA_ANON, 'Authorization': `Bearer ${SUPA_ANON}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ disponible })
+  });
   if (affected.length > 0) {
     if (!disponible) {
       await db.from('menu').update({ disponible: false }).in('id', affected);

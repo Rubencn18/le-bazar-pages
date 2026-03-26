@@ -3476,17 +3476,24 @@ let _stockIngredients = [];
 let _menuIngrMap = {}; // ingredient_id → [menu_ids]
 let _itemIngrMap = {}; // menu_id       → [ingredient_ids]
 
+async function _supaFetch(path) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+  });
+  return r.ok ? r.json() : [];
+}
+
 async function loadStocksView() {
   document.getElementById('stocks-grid').innerHTML = '<div style="color:var(--muted);padding:20px">Chargement…</div>';
-  const [menuRes, ingrRes, linkRes] = await Promise.all([
+  const [menuRes, ingrData, linkData] = await Promise.all([
     db.from('menu').select('id,nom,categorie,disponible').order('categorie').order('ordre'),
-    db.from('ingredients').select('id,nom,disponible').order('nom'),
-    db.from('menu_ingredients').select('menu_id,ingredient_id')
+    _supaFetch('ingredients?select=id,nom,disponible&order=nom'),
+    _supaFetch('menu_ingredients?select=menu_id,ingredient_id')
   ]);
   _stockItems       = menuRes.data || [];
-  _stockIngredients = ingrRes.data || [];
+  _stockIngredients = ingrData || [];
   _menuIngrMap = {}; _itemIngrMap = {};
-  (linkRes.data || []).forEach(({ menu_id, ingredient_id }) => {
+  (linkData || []).forEach(({ menu_id, ingredient_id }) => {
     if (!_menuIngrMap[ingredient_id]) _menuIngrMap[ingredient_id] = [];
     _menuIngrMap[ingredient_id].push(menu_id);
     if (!_itemIngrMap[menu_id]) _itemIngrMap[menu_id] = [];
@@ -3562,7 +3569,11 @@ async function toggleStockIngredient(ingrId, disponible) {
     }
   });
   renderStocksView();
-  await db.from('ingredients').update({ disponible }).eq('id', ingrId);
+  await fetch(`${SUPABASE_URL}/rest/v1/ingredients?id=eq.${ingrId}`, {
+    method: 'PATCH',
+    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ disponible })
+  });
   if (affected.length > 0) {
     if (!disponible) {
       await db.from('menu').update({ disponible: false }).in('id', affected);
