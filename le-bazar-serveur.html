@@ -248,7 +248,7 @@
     .table-card-status{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);}
     .table-card.occupee .table-card-status{color:var(--orange);}
     .table-card.reservee .table-card-status{color:#60a5fa;}
-    .table-card.bar{grid-column:span 2;aspect-ratio:unset;padding:16px;}
+    .table-card.bar{grid-column:span 2;aspect-ratio:2/1;padding:16px;}
     .salle-legend{display:flex;gap:20px;margin-top:20px;font-size:10px;letter-spacing:1px;color:var(--muted);}
     .legend-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;}
 
@@ -393,6 +393,7 @@ const TABLES = [
   {id:'T5',nom:'T5'},{id:'T6',nom:'T6'},{id:'T7',nom:'T7'},{id:'T8',nom:'T8'},
   {id:'T9',nom:'T9'},{id:'T10',nom:'T10'},
   {id:'BAR1',nom:'Bar 1',bar:true},{id:'BAR2',nom:'Bar 2',bar:true},
+  // Modifiable : ajoutez/retirez des tables ici
 ];
 
 function doLogin() {
