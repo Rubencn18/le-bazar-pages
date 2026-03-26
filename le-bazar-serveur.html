@@ -355,13 +355,17 @@ async function loadMenu() {
   const prefix = isMidi ? 'Midi/' : '';
   const otherPrefix = isMidi ? '' : 'Midi/';
 
-  // Filtrer les items du bon service + Boissons/Vins toujours disponibles
+  // Catégories toujours visibles (midi et soir)
+  const alwaysVisible = ['Softs','Vins Rouges','Vins Rosé & Blanc','Champagne'];
+
+  // Filtrer les items du bon service
   const filtered = data.filter(item => {
-    if (item.categorie === 'Boissons' || item.categorie === 'Vins') return true;
-    if (otherPrefix && item.categorie.startsWith(otherPrefix)) return false;
-    if (!isMidi && item.categorie.startsWith('Midi/')) return false;
-    if (isMidi && !item.categorie.startsWith('Midi/') && item.categorie !== 'Boissons' && item.categorie !== 'Vins') return false;
-    return true;
+    if (alwaysVisible.includes(item.categorie)) return true;
+    if (item.categorie.startsWith('Midi/')) {
+      return isMidi; // items Midi/ seulement le midi
+    }
+    // items sans préfixe (Soir) : seulement le soir
+    return !isMidi;
   });
 
   // Grouper par catégorie en retirant le préfixe Midi/
@@ -380,8 +384,8 @@ async function loadMenu() {
 
   // Ordre des onglets
   const catOrder = isMidi
-    ? ['Entrées','Salades','Plats','Desserts','Boissons','Vins']
-    : ['Entrées','Tacos','Salades','Plats','Grands Formats','Desserts','Boissons','Vins'];
+    ? ['Entrées','Salades','Plats','Desserts','Softs','Vins Rouges','Vins Rosé & Blanc','Champagne']
+    : ['Entrées','Tacos','Salades','Plats','Grands Formats','Desserts','Cocktails','Shots','Softs','Vins Rouges','Vins Rosé & Blanc','Champagne','Spiritueux'];
 
   const sortedCats = Object.entries(cats).sort(([a], [b]) => {
     const ai = catOrder.indexOf(a); const bi = catOrder.indexOf(b);
