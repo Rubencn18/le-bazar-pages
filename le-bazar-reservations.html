@@ -1684,7 +1684,8 @@ function renderReservationList() {
   const cancelledCount = allReservations.filter(r => r.statut === 'Annulée').length;
   const btnClear = document.getElementById('btn-clear-cancelled');
   const btnToggle = document.getElementById('btn-toggle-cancelled');
-  if (btnClear) btnClear.style.display = cancelledCount > 0 ? 'inline-block' : 'none';
+  // btn-clear-cancelled est toujours visible (supprime toutes dates confondues)
+  if (btnClear) btnClear.style.display = 'inline-block';
   if (btnToggle) btnToggle.style.display = cancelledCount > 0 ? 'inline-block' : 'none';
 
   container.innerHTML = '';
@@ -1871,22 +1872,45 @@ async function deleteReservation(id) {
 }
 
 async function deleteAllCancelled() {
-  const cancelled = allReservations.filter(r => r.statut === 'Annulée');
-  if (cancelled.length === 0) { showToast('Info', 'Aucune réservation annulée à supprimer.', 'info'); return; }
+  // Récupère TOUTES les réservations annulées (toutes dates) depuis Supabase
+  const { data: allCancelled, error: fetchError } = await db
+    .from('reservations')
+    .select('id')
+    .eq('statut', 'Annulée');
+
+  if (fetchError) {
+    console.error('deleteAllCancelled fetch error:', fetchError);
+    showToast('Erreur', 'Impossible de récupérer les réservations annulées.', 'error');
+    return;
+  }
+
+  if (!allCancelled || allCancelled.length === 0) {
+    showToast('Info', 'Aucune réservation annulée à supprimer.', 'info');
+    return;
+  }
+
+  const ids = allCancelled.map(r => r.id);
+  const count = ids.length;
 
   const confirmed = await confirmAction(
-    `Supprimer ${cancelled.length} réservation${cancelled.length > 1 ? 's' : ''} annulée${cancelled.length > 1 ? 's' : ''} ?`,
-    'Cette action supprimera définitivement toutes les réservations annulées de cette journée.'
+    `Supprimer ${count} réservation${count > 1 ? 's' : ''} annulée${count > 1 ? 's' : ''} ?`,
+    'Cette action supprimera définitivement toutes les réservations annulées (toutes dates confondues).'
   );
   if (!confirmed) return;
 
-  const ids = cancelled.map(r => `id=in.(${cancelled.map(r => `"${r.id}"`).join(',')})`);
-  const { error } = await db.from('reservations').delete().in('id', cancelled.map(r => r.id));
-  if (error) {
-    showToast('Erreur', 'Impossible de supprimer les réservations.', 'error');
-    return;
+  // Suppression par lots de 100 IDs pour éviter les limites PostgREST
+  const chunkSize = 100;
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const chunk = ids.slice(i, i + chunkSize);
+    const { error } = await db.from('reservations').delete().in('id', chunk);
+    if (error) {
+      console.error('deleteAllCancelled delete error:', error);
+      showToast('Erreur', 'Impossible de supprimer les réservations.', 'error');
+      return;
+    }
   }
-  showToast('Nettoyé', `${cancelled.length} réservation${cancelled.length > 1 ? 's' : ''} supprimée${cancelled.length > 1 ? 's' : ''}.`, 'success');
+
+  showToast('Nettoyé', `${count} réservation${count > 1 ? 's' : ''} supprimée${count > 1 ? 's' : ''}.`, 'success');
   await refreshData();
 }
 
@@ -2165,6 +2189,15 @@ function renderClients(list) {
           📋 Voir
         </button>
       </td>
+      <td style="padding:12px 8px;text-align:center;">
+        <button onclick="deleteClient('${c.id}', '${nomEscaped}')"
+          style="background:transparent;border:1px solid rgba(224,80,80,0.35);color:var(--red);padding:4px 10px;font-size:11px;cursor:pointer;transition:all .2s;"
+          onmouseover="this.style.background='var(--red-dim)'"
+          onmouseout="this.style.background='transparent'"
+          title="Supprimer ce client">
+          🗑️
+        </button>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -2177,6 +2210,21 @@ function filterClients(q) {
     (c.telephone||'').includes(lq) ||
     (c.email||'').toLowerCase().includes(lq)
   ));
+}
+
+async function deleteClient(id, nom) {
+  const confirmed = await confirmAction(
+    `Supprimer ${nom} ?`,
+    'Cette action supprimera définitivement ce client et toutes ses données (notes, allergènes, historique).'
+  );
+  if (!confirmed) return;
+  const { error } = await db.from('clients').delete().eq('id', id);
+  if (error) {
+    showToast('Erreur', 'Impossible de supprimer ce client.', 'error');
+    return;
+  }
+  showToast('Client supprimé', `${nom} a été supprimé de la base.`, 'success');
+  await loadClients();
 }
 
 function openClientNotes(id, nom, notes, allergenes) {
