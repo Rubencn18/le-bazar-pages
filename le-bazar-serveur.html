@@ -221,6 +221,37 @@
     }
     #modal-note.open{display:flex}
 
+    /* ── PLAN DE SALLE ── */
+    #screen-salle{
+      display:none;flex-direction:column;align-items:center;justify-content:center;
+      min-height:100vh;background:#000;padding:32px 20px;
+    }
+    .salle-title{font-size:22px;font-weight:800;letter-spacing:6px;margin-bottom:4px;text-align:center}
+    .salle-sub{font-size:10px;color:var(--muted);letter-spacing:3px;text-transform:uppercase;margin-bottom:32px;text-align:center}
+    .salle-grid{
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:12px;
+      width:100%;max-width:520px;
+    }
+    .table-card{
+      aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      border:1px solid var(--border2);cursor:pointer;transition:all .2s;gap:4px;
+      background:var(--surface);position:relative;
+    }
+    .table-card:hover{border-color:var(--orange);transform:scale(1.04);}
+    .table-card.occupee{border-color:var(--orange);background:var(--orange-dim);}
+    .table-card.occupee::after{content:'●';position:absolute;top:6px;right:8px;font-size:8px;color:var(--orange);}
+    .table-card.reservee{border-color:#60a5fa;background:rgba(96,165,250,0.08);}
+    .table-card.reservee::after{content:'◆';position:absolute;top:6px;right:8px;font-size:8px;color:#60a5fa;}
+    .table-card-nom{font-size:18px;font-weight:800;letter-spacing:1px;}
+    .table-card-status{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);}
+    .table-card.occupee .table-card-status{color:var(--orange);}
+    .table-card.reservee .table-card-status{color:#60a5fa;}
+    .table-card.bar{grid-column:span 2;aspect-ratio:unset;padding:16px;}
+    .salle-legend{display:flex;gap:20px;margin-top:20px;font-size:10px;letter-spacing:1px;color:var(--muted);}
+    .legend-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;}
+
     /* ── TOAST ── */
     #toast{
       position:fixed;top:70px;left:50%;transform:translateX(-50%);
@@ -256,12 +287,22 @@
     <div class="login-title">Prise de commande</div>
     <label>Votre prénom</label>
     <input type="text" id="inp-serveur" placeholder="Ex : Sophie" autocomplete="off"/>
-    <label>Table n°</label>
-    <input type="text" id="inp-table" placeholder="Ex : T3 ou Bar 2" autocomplete="off"/>
     <label>Code accès</label>
     <input type="password" id="inp-pass" placeholder="••••••"/>
     <button onclick="doLogin()">Accéder →</button>
     <div id="login-err"></div>
+  </div>
+</div>
+
+<!-- PLAN DE SALLE -->
+<div id="screen-salle">
+  <div class="salle-title">LE BAZAR</div>
+  <div class="salle-sub" id="salle-sub">Choisissez votre table</div>
+  <div class="salle-grid" id="salle-grid"></div>
+  <div class="salle-legend">
+    <span><span class="legend-dot" style="background:var(--border2);border:1px solid var(--border2)"></span>Libre</span>
+    <span><span class="legend-dot" style="background:var(--orange)"></span>Occupée</span>
+    <span><span class="legend-dot" style="background:#60a5fa"></span>Réservée</span>
   </div>
 </div>
 
@@ -281,7 +322,7 @@
     <div class="hdr-info">
       <span class="hdr-table" id="hdr-table">—</span>
       <span class="hdr-serveur" id="hdr-serveur">—</span>
-      <button class="btn-change-table" onclick="openTableModal(false)">Changer table</button>
+      <button class="btn-change-table" onclick="showSalle(true)">Changer table</button>
     </div>
   </header>
 
@@ -346,19 +387,65 @@ let currentCat     = '';
 // ──────────────────────────────────────────
 // LOGIN
 // ──────────────────────────────────────────
+// ── TABLES CONFIG ─────────────────────────
+const TABLES = [
+  {id:'T1',nom:'T1'},{id:'T2',nom:'T2'},{id:'T3',nom:'T3'},{id:'T4',nom:'T4'},
+  {id:'T5',nom:'T5'},{id:'T6',nom:'T6'},{id:'T7',nom:'T7'},{id:'T8',nom:'T8'},
+  {id:'T9',nom:'T9'},{id:'T10',nom:'T10'},
+  {id:'BAR1',nom:'Bar 1',bar:true},{id:'BAR2',nom:'Bar 2',bar:true},
+];
+
 function doLogin() {
   const serveur = document.getElementById('inp-serveur').value.trim();
-  const table   = document.getElementById('inp-table').value.trim();
   const pass    = document.getElementById('inp-pass').value;
   const err     = document.getElementById('login-err');
 
   if (!serveur) { err.textContent = 'Entrez votre prénom.'; return; }
-  if (!table)   { err.textContent = 'Entrez un numéro de table.'; return; }
   if (pass !== ACCESS_CODE) { err.textContent = 'Code incorrect.'; return; }
 
   currentServeur = serveur;
-  currentTable   = table;
   err.textContent = '';
+  showSalle();
+}
+
+async function showSalle(changingTable) {
+  document.getElementById('screen-login').style.display    = 'none';
+  document.getElementById('screen-app').style.display      = 'none';
+  document.getElementById('screen-salle').style.display    = 'flex';
+  document.getElementById('salle-sub').textContent =
+    changingTable ? `${currentServeur} — choisissez une table` : 'Choisissez votre table';
+
+  // Render table cards
+  const grid = document.getElementById('salle-grid');
+  grid.innerHTML = TABLES.map(t => `
+    <div class="table-card${t.bar?' bar':''}" id="tcard-${t.id}" onclick="selectTable('${t.nom}')">
+      <div class="table-card-nom">${t.nom}</div>
+      <div class="table-card-status" id="tstatus-${t.id}">Libre</div>
+    </div>`).join('');
+
+  // Load statuses
+  const today = new Date().toISOString().split('T')[0];
+  const [{ data: orders }, { data: resas }] = await Promise.all([
+    db.from('commandes_salle').select('table_nom').in('statut', ['En attente', 'En préparation', 'Prêt']),
+    db.from('reservations').select('table_nom').eq('date_reservation', today).in('statut', ['confirmé','en_attente'])
+  ]);
+
+  const occupees  = new Set((orders||[]).map(o => o.table_nom));
+  const reservees = new Set((resas||[]).map(r => r.table_nom).filter(n => !occupees.has(n)));
+
+  TABLES.forEach(t => {
+    const card   = document.getElementById('tcard-' + t.id);
+    const status = document.getElementById('tstatus-' + t.id);
+    if (!card) return;
+    if (occupees.has(t.nom))  { card.classList.add('occupee');  status.textContent = 'Occupée'; }
+    else if (reservees.has(t.nom)) { card.classList.add('reservee'); status.textContent = 'Réservée'; }
+  });
+}
+
+function selectTable(tableName) {
+  currentTable = tableName;
+  document.getElementById('screen-salle').style.display = 'none';
+  document.getElementById('hdr-table').textContent = tableName;
   initApp();
 }
 
@@ -371,9 +458,10 @@ document.getElementById('inp-pass').addEventListener('keydown', e => {
 // ──────────────────────────────────────────
 async function initApp() {
   document.getElementById('screen-login').style.display = 'none';
+  document.getElementById('screen-salle').style.display = 'none';
   document.getElementById('screen-app').style.display   = 'flex';
-  document.getElementById('hdr-table').textContent   = currentTable;
-  document.getElementById('hdr-serveur').textContent = currentServeur;
+  document.getElementById('hdr-table').textContent      = currentTable;
+  document.getElementById('hdr-serveur').textContent    = currentServeur;
   await loadMenu();
 }
 
