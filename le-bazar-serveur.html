@@ -378,7 +378,17 @@ async function loadMenu() {
   if (hdrEl) hdrEl.title = serviceLabel;
   showToast(serviceLabel, false);
 
-  menu = Object.entries(cats).map(([cat, items]) => ({ categorie: cat, items }));
+  // Ordre des onglets
+  const catOrder = isMidi
+    ? ['Entrées','Salades','Plats','Desserts','Boissons','Vins']
+    : ['Entrées','Tacos','Salades','Plats','Grands Formats','Desserts','Boissons','Vins'];
+
+  const sortedCats = Object.entries(cats).sort(([a], [b]) => {
+    const ai = catOrder.indexOf(a); const bi = catOrder.indexOf(b);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
+
+  menu = sortedCats.map(([cat, items]) => ({ categorie: cat, items }));
   renderCatNav();
   if (menu.length) renderItems(menu[0].categorie);
 }
