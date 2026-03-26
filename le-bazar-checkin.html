@@ -122,6 +122,19 @@
   @keyframes spin { to { transform: rotate(360deg); } }
 
   footer { margin-top: 20px; color: var(--muted); font-size: 0.72rem; }
+
+  @media (max-width: 440px) {
+    body { padding: 12px; }
+    .card { padding: 24px 18px; border-radius: 12px; }
+    .logo { font-size: 1.35rem; }
+    .resa-name { font-size: 1.1rem; }
+    .btn-confirm { padding: 14px; font-size: 0.95rem; min-height: 50px; }
+    .search-btn { min-height: 50px; }
+    .search-input { font-size: 0.95rem; }
+    .result-item { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .btn-mini { width: 100%; text-align: center; padding: 10px; min-height: 44px; }
+    .resa-row { font-size: 0.82rem; }
+  }
 </style>
 </head>
 <body>

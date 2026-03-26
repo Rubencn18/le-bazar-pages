@@ -998,19 +998,26 @@
   <!-- ══ VUE STATS ══ -->
   <div id="view-stats">
     <div class="view-header">
-      <div class="view-title">📊 Statistiques</div>
+      <div>
+        <div class="view-title">📊 Statistiques</div>
+        <div style="display:flex;gap:4px;margin-top:8px;">
+          <button class="filter-btn active" id="stats-btn-14" onclick="setStatsPeriod(14)">14 j</button>
+          <button class="filter-btn" id="stats-btn-30" onclick="setStatsPeriod(30)">30 j</button>
+          <button class="filter-btn" id="stats-btn-90" onclick="setStatsPeriod(90)">3 mois</button>
+        </div>
+      </div>
       <div class="view-actions">
         <span style="color:var(--muted);font-size:13px;">Ticket moyen :</span>
         <input type="number" id="ticket-moyen" min="0" step="5" value="35"
           style="width:72px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:6px 10px;font-size:13px;font-family:inherit;outline:none;text-align:right;transition:border-color .2s;"
           onfocus="this.style.borderColor='var(--orange)'" onblur="this.style.borderColor='var(--border2)'"
-          oninput="localStorage.setItem('bazar-ticket-moyen',this.value);renderStats(window._lastStatsResas||[],window._lastStatsClients||[])" />
+          oninput="localStorage.setItem('bazar-ticket-moyen',this.value);renderStats(window._lastStatsResas||[],window._lastStatsClients||[],window._statsPeriod||14)" />
         <span style="color:var(--muted);font-size:13px;">€ / couvert</span>
         <button onclick="exportCSV('clients')" class="tool-btn">⬇️ Export clients</button>
       </div>
     </div>
     <div class="stats-kpi-grid" id="stats-kpis"></div>
-    <div class="stats-section-title">Couverts par jour — 14 derniers jours</div>
+    <div class="stats-section-title" id="stats-chart-title">Couverts par jour — 14 derniers jours</div>
     <div id="stats-chart-wrap"></div>
     <div class="stats-two-col" style="margin-top:4px">
       <div>
@@ -1032,6 +1039,7 @@
         <div class="view-subtitle" id="clients-count">Chargement…</div>
       </div>
       <div class="view-actions">
+        <button id="btn-filter-vip" class="tool-btn" onclick="toggleVipFilter()" title="Afficher uniquement les VIP">⭐ VIP</button>
         <button onclick="exportCSV('clients')" class="tool-btn">⬇️ Export CSV</button>
         <input id="clients-search" type="text" class="view-search" placeholder="Rechercher nom, téléphone, email…"
           oninput="filterClients(this.value)" />
@@ -1049,6 +1057,7 @@
           <th style="padding:10px 12px;text-align:left;font-weight:600;">Dernière visite</th>
           <th style="padding:10px 12px;text-align:left;font-weight:600;">Notes</th>
           <th style="padding:10px 12px;text-align:left;font-weight:600;">Historique</th>
+          <th style="padding:10px 8px;text-align:center;font-weight:600;">Suppr.</th>
         </tr>
       </thead>
       <tbody id="clients-tbody"></tbody>
@@ -2298,14 +2307,24 @@ function renderClients(list) {
   }).join('');
 }
 
+let vipFilterOn = false;
 function filterClients(q) {
-  if (!q.trim()) { renderClients(allClients); return; }
-  const lq = q.toLowerCase();
-  renderClients(allClients.filter(c =>
-    (c.nom||'').toLowerCase().includes(lq) ||
-    (c.telephone||'').includes(lq) ||
-    (c.email||'').toLowerCase().includes(lq)
-  ));
+  let list = vipFilterOn ? allClients.filter(c => c.vip) : allClients;
+  if (q && q.trim()) {
+    const lq = q.toLowerCase();
+    list = list.filter(c =>
+      (c.nom||'').toLowerCase().includes(lq) ||
+      (c.telephone||'').includes(lq) ||
+      (c.email||'').toLowerCase().includes(lq)
+    );
+  }
+  renderClients(list);
+}
+function toggleVipFilter() {
+  vipFilterOn = !vipFilterOn;
+  const btn = document.getElementById('btn-filter-vip');
+  if (btn) btn.classList.toggle('active', vipFilterOn);
+  filterClients(document.getElementById('clients-search')?.value || '');
 }
 
 async function deleteClient(id, nom) {
@@ -3038,13 +3057,24 @@ function isDateBlocked(date, heure) {
 // ═══════════════════════════════════════════
 // 📊 STATS
 // ═══════════════════════════════════════════
-async function loadStats() {
-  const since = new Date(); since.setDate(since.getDate() - 13);
+window._statsPeriod = 14;
+async function setStatsPeriod(days) {
+  window._statsPeriod = days;
+  [14, 30, 90].forEach(d => {
+    const btn = document.getElementById(`stats-btn-${d}`);
+    if (btn) btn.classList.toggle('active', d === days);
+  });
+  await loadStats(days);
+}
+
+async function loadStats(days = window._statsPeriod || 14) {
+  const since = new Date(); since.setDate(since.getDate() - (days - 1));
   const sinceStr = since.toISOString().split('T')[0];
 
-  const [{ data: resas }, { data: clients }] = await Promise.all([
+  const [{ data: resas }, { data: clients }, { count: newClients }] = await Promise.all([
     db.from('reservations').select('date_reservation,nombre_personnes,nom_client,telephone,statut').gte('date_reservation', sinceStr),
-    db.from('clients').select('nom,telephone,nb_reservations,nb_couverts').order('nb_reservations', { ascending: false }).limit(5)
+    db.from('clients').select('nom,telephone,nb_reservations,nb_couverts').order('nb_reservations', { ascending: false }).limit(5),
+    db.from('clients').select('id', { count: 'exact', head: true }).gte('created_at', sinceStr)
   ]);
 
   // Restore saved ticket moyen
@@ -3053,35 +3083,45 @@ async function loadStats() {
 
   window._lastStatsResas   = resas || [];
   window._lastStatsClients = clients || [];
-  renderStats(resas || [], clients || []);
+  window._lastNewClients   = newClients || 0;
+  renderStats(resas || [], clients || [], days);
 }
 
-function renderStats(resas, topClients) {
+function renderStats(resas, topClients, period = window._statsPeriod || 14) {
   const noShows     = resas.filter(r => r.statut === 'No-show');
+  const annulations = resas.filter(r => r.statut === 'Annulée');
   const active      = resas.filter(r => r.statut !== 'Annulée');
   const totalResas  = active.length;
   const totalCvts   = active.filter(r => r.statut !== 'No-show').reduce((s, r) => s + (parseInt(r.nombre_personnes)||0), 0);
-  const avgPerDay   = totalResas > 0 ? (totalCvts / 14).toFixed(1) : 0;
+  const avgPerDay   = period > 0 ? (totalCvts / period).toFixed(1) : 0;
   const totalTables = Object.values(ZONES).flat().length;
   const maxDay      = totalTables * 2;
-  const txRemplissage = maxDay > 0 ? Math.round((totalResas / (14 * maxDay)) * 100) : 0;
+  const txRemplissage = maxDay > 0 ? Math.round((totalResas / (period * maxDay)) * 100) : 0;
   const txNoShow    = totalResas > 0 ? Math.round((noShows.length / totalResas) * 100) : 0;
   const ticketMoyen = parseFloat(document.getElementById('ticket-moyen')?.value || localStorage.getItem('bazar-ticket-moyen') || 35) || 35;
   const caEstime    = (totalCvts * ticketMoyen).toLocaleString('fr-FR');
+  const newClients  = window._lastNewClients || 0;
+  const periodLabel = period === 90 ? '3 mois' : `${period}j`;
+
+  // Update chart title
+  const chartTitle = document.getElementById('stats-chart-title');
+  if (chartTitle) chartTitle.textContent = `Couverts par jour — ${period === 90 ? '3 derniers mois' : `${period} derniers jours`}`;
 
   // KPIs
   document.getElementById('stats-kpis').innerHTML = `
-    <div class="stats-kpi"><div class="stats-kpi-val">${totalResas}</div><div class="stats-kpi-label">Réservations (14j)</div></div>
-    <div class="stats-kpi"><div class="stats-kpi-val">${totalCvts}</div><div class="stats-kpi-label">Couverts (14j)</div></div>
+    <div class="stats-kpi"><div class="stats-kpi-val">${totalResas}</div><div class="stats-kpi-label">Réservations (${periodLabel})</div></div>
+    <div class="stats-kpi"><div class="stats-kpi-val">${totalCvts}</div><div class="stats-kpi-label">Couverts (${periodLabel})</div></div>
     <div class="stats-kpi"><div class="stats-kpi-val">${avgPerDay}</div><div class="stats-kpi-label">Couverts/jour moy.</div></div>
     <div class="stats-kpi" style="border-left-color:var(--green)"><div class="stats-kpi-val" style="color:var(--green)">${txRemplissage}%</div><div class="stats-kpi-label">Taux remplissage</div></div>
     <div class="stats-kpi" style="border-left-color:#c084fc"><div class="stats-kpi-val" style="color:#c084fc">${txNoShow}%</div><div class="stats-kpi-label">Taux no-show <span style="font-size:11px;font-weight:400">(${noShows.length})</span></div></div>
-    <div class="stats-kpi" style="border-left-color:#ffd700"><div class="stats-kpi-val" style="color:#ffd700">${caEstime} €</div><div class="stats-kpi-label">CA estimé (14j)</div></div>
+    <div class="stats-kpi" style="border-left-color:#ffd700"><div class="stats-kpi-val" style="color:#ffd700">${caEstime} €</div><div class="stats-kpi-label">CA estimé (${periodLabel})</div></div>
+    <div class="stats-kpi" style="border-left-color:var(--red)"><div class="stats-kpi-val" style="color:var(--red)">${annulations.length}</div><div class="stats-kpi-label">Annulations (${periodLabel})</div></div>
+    <div class="stats-kpi" style="border-left-color:#38bdf8"><div class="stats-kpi-val" style="color:#38bdf8">${newClients}</div><div class="stats-kpi-label">Nouveaux clients (${periodLabel})</div></div>
   `;
 
-  // Bar chart — couverts par jour sur 14 jours
+  // Bar chart — couverts par jour
   const days = {};
-  for (let i = 13; i >= 0; i--) {
+  for (let i = period - 1; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i);
     days[d.toISOString().split('T')[0]] = 0;
   }
