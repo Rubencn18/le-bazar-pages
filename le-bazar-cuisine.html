@@ -134,6 +134,61 @@
     .ticket-time.warn   { color:var(--yellow);background:var(--yellow-dim); }
     .ticket-time.urgent { color:var(--red);background:rgba(224,80,80,0.15); }
 
+    /* ── STOCK PANEL ── */
+    #stock-overlay{
+      display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;
+      align-items:flex-start;justify-content:flex-end;
+    }
+    #stock-overlay.open{display:flex}
+    #stock-panel{
+      width:380px;height:100vh;background:var(--surface);border-left:1px solid var(--border2);
+      display:flex;flex-direction:column;overflow:hidden;
+    }
+    .stock-hdr{
+      padding:16px 20px;border-bottom:1px solid var(--border);
+      display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
+    }
+    .stock-hdr-title{font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase}
+    .stock-close{background:transparent;border:none;color:var(--muted);font-size:20px;line-height:1;padding:4px;}
+    .stock-close:hover{color:var(--text)}
+    .stock-body{flex:1;overflow-y:auto;padding:12px 0;}
+    .stock-cat{padding:8px 20px 4px;font-size:9px;font-weight:700;letter-spacing:2px;color:var(--muted);text-transform:uppercase;border-top:1px solid var(--border);margin-top:4px;}
+    .stock-cat:first-child{border-top:none;margin-top:0;}
+    .stock-item{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:10px 20px;transition:background .1s;
+    }
+    .stock-item:hover{background:rgba(255,255,255,0.03)}
+    .stock-item-nom{font-size:12px;font-weight:500;flex:1}
+    .stock-toggle{
+      position:relative;width:44px;height:24px;flex-shrink:0;
+    }
+    .stock-toggle input{opacity:0;width:0;height:0;position:absolute}
+    .stock-slider{
+      position:absolute;inset:0;border-radius:12px;cursor:pointer;
+      background:var(--border2);transition:background .2s;
+    }
+    .stock-slider::before{
+      content:'';position:absolute;width:18px;height:18px;border-radius:50%;
+      left:3px;top:3px;background:#fff;transition:transform .2s;
+    }
+    .stock-toggle input:checked + .stock-slider{background:var(--green)}
+    .stock-toggle input:checked + .stock-slider::before{transform:translateX(20px)}
+    .stock-rupture-tag{
+      font-size:9px;font-weight:700;letter-spacing:1px;color:var(--red);
+      text-transform:uppercase;margin-right:10px;
+    }
+    .btn-stocks{
+      padding:5px 12px;background:transparent;border:1px solid var(--border2);
+      color:var(--muted);font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;
+      transition:all .15s;
+    }
+    .btn-stocks:hover{border-color:var(--orange);color:var(--orange)}
+    .btn-stocks .rupture-count{
+      background:var(--red);color:#fff;border-radius:10px;
+      padding:1px 6px;font-size:9px;margin-left:6px;display:none;
+    }
+
     /* ── TOAST ── */
     #toast{
       position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
@@ -190,6 +245,7 @@
     <button class="filter-btn"        id="filter-att"   onclick="setFilter('En attente')">En attente</button>
     <button class="filter-btn"        id="filter-prep"  onclick="setFilter('En préparation')">En prép.</button>
     <button class="filter-btn"        id="filter-pret"  onclick="setFilter('Prêt')">Prêt</button>
+    <button class="btn-stocks" onclick="openStocks()">📦 Stocks <span class="rupture-count" id="rupture-count">0</span></button>
   </div>
 </header>
 
@@ -199,6 +255,17 @@
     <div class="empty-board-icon">🍽️</div>
     <div class="empty-board-title">Aucune commande active</div>
     <div>Les commandes apparaissent ici en temps réel.</div>
+  </div>
+</div>
+
+<!-- STOCK PANEL -->
+<div id="stock-overlay" onclick="e => { if(e.target===this) closeStocks() }">
+  <div id="stock-panel">
+    <div class="stock-hdr">
+      <div class="stock-hdr-title">📦 Gestion des stocks</div>
+      <button class="stock-close" onclick="closeStocks()">✕</button>
+    </div>
+    <div class="stock-body" id="stock-body">Chargement…</div>
   </div>
 </div>
 
@@ -453,6 +520,59 @@ function playPretSound() {
       osc.stop(ctx.currentTime + i * 0.11 + 0.26);
     });
   } catch(e) {}
+}
+
+// ── STOCKS ────────────────────────────────
+let allMenuItems = [];
+
+async function openStocks() {
+  document.getElementById('stock-overlay').classList.add('open');
+  const { data } = await db.from('menu').select('id,nom,categorie,disponible').order('categorie').order('ordre');
+  allMenuItems = data || [];
+  renderStocks();
+}
+
+function closeStocks() {
+  document.getElementById('stock-overlay').classList.remove('open');
+}
+
+function renderStocks() {
+  const body = document.getElementById('stock-body');
+  const cats = {};
+  allMenuItems.forEach(item => {
+    if (!cats[item.categorie]) cats[item.categorie] = [];
+    cats[item.categorie].push(item);
+  });
+
+  body.innerHTML = Object.entries(cats).map(([cat, items]) => `
+    <div class="stock-cat">${cat.replace('Midi/', '🌞 ')||cat}</div>
+    ${items.map(item => `
+      <div class="stock-item">
+        <div class="stock-item-nom">${item.nom}</div>
+        ${!item.disponible ? '<span class="stock-rupture-tag">Rupture</span>' : ''}
+        <label class="stock-toggle">
+          <input type="checkbox" ${item.disponible ? 'checked' : ''} onchange="toggleStock(${item.id}, this.checked)">
+          <span class="stock-slider"></span>
+        </label>
+      </div>`).join('')}
+  `).join('');
+
+  updateRuptureCount();
+}
+
+async function toggleStock(itemId, disponible) {
+  // Optimistic
+  const item = allMenuItems.find(i => i.id === itemId);
+  if (item) item.disponible = disponible;
+  renderStocks();
+  await db.from('menu').update({ disponible }).eq('id', itemId);
+}
+
+function updateRuptureCount() {
+  const n = allMenuItems.filter(i => !i.disponible).length;
+  const badge = document.getElementById('rupture-count');
+  badge.textContent = n;
+  badge.style.display = n > 0 ? 'inline' : 'none';
 }
 
 // ── TOAST ─────────────────────────────────

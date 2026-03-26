@@ -464,6 +464,10 @@ async function initApp() {
   document.getElementById('hdr-table').textContent      = currentTable;
   document.getElementById('hdr-serveur').textContent    = currentServeur;
   await loadMenu();
+  // Realtime : recharge le menu si la cuisine change la dispo d'un plat
+  db.channel('menu-dispo')
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'menu' }, () => loadMenu())
+    .subscribe();
 }
 
 async function loadMenu() {
