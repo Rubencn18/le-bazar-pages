@@ -348,12 +348,36 @@ async function initApp() {
 async function loadMenu() {
   const { data, error } = await db.from('menu').select('*').eq('disponible', true).order('ordre');
   if (error || !data) { showToast('Erreur chargement menu', true); return; }
-  // Group by category
-  const cats = {};
-  data.forEach(item => {
-    if (!cats[item.categorie]) cats[item.categorie] = [];
-    cats[item.categorie].push(item);
+
+  // Déterminer le service selon l'heure : avant 16h = Midi, sinon Soir
+  const h = new Date().getHours();
+  const isMidi = h >= 10 && h < 16;
+  const prefix = isMidi ? 'Midi/' : '';
+  const otherPrefix = isMidi ? '' : 'Midi/';
+
+  // Filtrer les items du bon service + Boissons/Vins toujours disponibles
+  const filtered = data.filter(item => {
+    if (item.categorie === 'Boissons' || item.categorie === 'Vins') return true;
+    if (otherPrefix && item.categorie.startsWith(otherPrefix)) return false;
+    if (!isMidi && item.categorie.startsWith('Midi/')) return false;
+    if (isMidi && !item.categorie.startsWith('Midi/') && item.categorie !== 'Boissons' && item.categorie !== 'Vins') return false;
+    return true;
   });
+
+  // Grouper par catégorie en retirant le préfixe Midi/
+  const cats = {};
+  filtered.forEach(item => {
+    const cat = item.categorie.replace(/^Midi\//, '');
+    if (!cats[cat]) cats[cat] = [];
+    cats[cat].push({ ...item, categorie: cat });
+  });
+
+  // Indicateur service dans le header
+  const serviceLabel = isMidi ? '🌞 Service Midi' : '🌙 Service Soir';
+  const hdrEl = document.getElementById('hdr-table');
+  if (hdrEl) hdrEl.title = serviceLabel;
+  showToast(serviceLabel, false);
+
   menu = Object.entries(cats).map(([cat, items]) => ({ categorie: cat, items }));
   renderCatNav();
   if (menu.length) renderItems(menu[0].categorie);
