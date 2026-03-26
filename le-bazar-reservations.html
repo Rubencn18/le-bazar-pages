@@ -758,6 +758,48 @@
       display: none; align-items: center; justify-content: center; line-height: 1;
     }
 
+    /* ── Stocks tab ── */
+    #view-stocks {
+      display: none; flex: 1; overflow: auto; padding: 28px 36px;
+      flex-direction: column;
+    }
+    .stocks-grid { display: flex; flex-wrap: wrap; gap: 14px; align-content: flex-start; }
+    .stocks-cat-block { width: 280px; background: var(--surface2); border: 1px solid var(--border); }
+    .stocks-cat-title {
+      padding: 10px 16px; font-size: 9px; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border);
+    }
+    .stock-row {
+      display: flex; align-items: center; padding: 9px 16px; gap: 10px;
+      border-bottom: 1px solid var(--border); transition: background .12s;
+    }
+    .stock-row:last-child { border-bottom: none; }
+    .stock-row:hover { background: rgba(255,255,255,0.03); }
+    .stock-row-nom { flex: 1; font-size: 12px; font-weight: 500; }
+    .stock-row-tag {
+      font-size: 9px; font-weight: 700; letter-spacing: 1px; padding: 2px 7px;
+      border: 1px solid rgba(224,80,80,.4); color: var(--red); background: var(--red-dim);
+      text-transform: uppercase;
+    }
+    .stock-switch { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; }
+    .stock-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .stock-slide {
+      position: absolute; cursor: pointer; inset: 0; background: rgba(255,255,255,.12);
+      transition: .2s; border-radius: 20px;
+    }
+    .stock-slide::before {
+      content: ''; position: absolute; height: 14px; width: 14px; left: 3px; bottom: 3px;
+      background: #fff; border-radius: 50%; transition: .2s;
+    }
+    .stock-switch input:checked + .stock-slide { background: var(--green); }
+    .stock-switch input:checked + .stock-slide::before { transform: translateX(16px); }
+    #stocks-rupture-bar {
+      display: none; padding: 8px 16px; background: var(--red-dim);
+      border: 1px solid rgba(224,80,80,.3); border-left: 3px solid var(--red);
+      font-size: 12px; color: var(--red); font-weight: 600; margin-bottom: 20px;
+      letter-spacing: .5px;
+    }
+
     /* ── Annulations tab ── */
     #view-annulations {
       display: none; flex: 1; overflow: auto; padding: 28px 36px;
@@ -802,7 +844,7 @@
       #screen-login,#app-header,#floor-plan,.service-filter,
       #btn-new-resa,#btn-toggle-cancelled,#btn-clear-cancelled,
       #waitlist-section,.modal-overlay,#toast-container,
-      #loading-overlay,#bg-logo,#view-clients,#view-stats,#view-commandes,#view-annulations,#annul-notif,#cmd-notif,
+      #loading-overlay,#bg-logo,#view-clients,#view-stats,#view-commandes,#view-annulations,#view-stocks,#annul-notif,#cmd-notif,
       .resa-actions,#print-btn-group { display:none !important; }
       body,html { background:#fff !important; color:#000 !important; }
       #screen-dashboard { display:block !important; background:#fff !important; }
@@ -918,6 +960,7 @@
     </span>
     <span id="tab-annulations-wrap" style="position:relative;display:flex;">
       <button id="tab-annulations" class="tab-btn" onclick="switchTab('annulations')">❌ Annulations</button>
+      <button id="tab-stocks" class="tab-btn" onclick="switchTab('stocks')">📦 Stocks</button>
       <span id="annul-count-badge" style="position:absolute;top:6px;right:4px;background:var(--red);color:#fff;border-radius:50%;width:15px;height:15px;font-size:9px;font-weight:700;display:none;align-items:center;justify-content:center;line-height:1;"></span>
     </span>
   </nav>
@@ -1131,6 +1174,19 @@
 </div>
 
 <!-- ══ NOTIFICATION ANNULATION ══ -->
+  <!-- ══ VUE STOCKS ══ -->
+  <div id="view-stocks">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+      <div>
+        <div style="font-size:18px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">📦 Gestion des stocks</div>
+        <div style="color:var(--muted);font-size:12px;margin-top:4px;" id="stocks-subtitle">Chargement…</div>
+      </div>
+      <button onclick="loadStocksView()" style="padding:8px 14px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-size:12px;cursor:pointer;" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">🔄 Actualiser</button>
+    </div>
+    <div id="stocks-rupture-bar">⚠️ <span id="stocks-rupture-count">0</span> plat(s) en rupture de stock</div>
+    <div class="stocks-grid" id="stocks-grid">Chargement…</div>
+  </div>
+
 <div id="annul-notif">
   <button class="annul-notif-close" onclick="closeAnnulNotif()">✕</button>
   <div class="annul-notif-title">❌ Nouvelle annulation</div>
@@ -2232,12 +2288,13 @@ let allClients = [];
 let currentEditClientId = null;
 
 function switchTab(tab) {
-  const tabs = ['reservations','clients','stats','commandes','annulations'];
+  const tabs = ['reservations','clients','stats','commandes','annulations','stocks'];
   document.getElementById('app-main').style.display         = tab === 'reservations' ? 'flex' : 'none';
   document.getElementById('view-clients').style.display      = tab === 'clients' ? 'flex' : 'none';
   document.getElementById('view-stats').style.display        = tab === 'stats' ? 'flex' : 'none';
   document.getElementById('view-commandes').style.display    = tab === 'commandes' ? 'flex' : 'none';
   document.getElementById('view-annulations').style.display  = tab === 'annulations' ? 'flex' : 'none';
+  document.getElementById('view-stocks').style.display       = tab === 'stocks' ? 'flex' : 'none';
   tabs.forEach(t => {
     const btn = document.getElementById('tab-' + t);
     if (!btn) return;
@@ -2247,6 +2304,7 @@ function switchTab(tab) {
   if (tab === 'stats')       loadStats();
   if (tab === 'commandes')   { loadCommandes(); clearCmdBadge(); }
   if (tab === 'annulations') { loadAnnulations(); clearAnnulBadge(); }
+  if (tab === 'stocks')      loadStocksView();
 }
 
 async function loadClients() {
@@ -3408,6 +3466,55 @@ async function pollCommandes() {
 function startCmdPolling() {
   pollCommandes();
   _cmdPollTimer = setInterval(pollCommandes, 20000);
+}
+
+// ═══════════════════════════════════════════
+// 📦 GESTION DES STOCKS
+// ═══════════════════════════════════════════
+let _stockItems = [];
+
+async function loadStocksView() {
+  document.getElementById('stocks-grid').innerHTML = '<div style="color:var(--muted);padding:20px">Chargement…</div>';
+  const { data } = await db.from('menu').select('id,nom,categorie,disponible').order('categorie').order('ordre');
+  _stockItems = data || [];
+  renderStocksView();
+}
+
+function renderStocksView() {
+  const ruptures = _stockItems.filter(i => !i.disponible).length;
+  const bar = document.getElementById('stocks-rupture-bar');
+  bar.style.display = ruptures > 0 ? 'block' : 'none';
+  document.getElementById('stocks-rupture-count').textContent = ruptures;
+  document.getElementById('stocks-subtitle').textContent =
+    ruptures > 0 ? `${ruptures} rupture${ruptures > 1 ? 's' : ''}` : 'Tous les plats sont disponibles';
+
+  const cats = {};
+  _stockItems.forEach(item => {
+    const cat = item.categorie || 'Autre';
+    if (!cats[cat]) cats[cat] = [];
+    cats[cat].push(item);
+  });
+
+  document.getElementById('stocks-grid').innerHTML = Object.entries(cats).map(([cat, items]) => `
+    <div class="stocks-cat-block">
+      <div class="stocks-cat-title">${cat.replace(/^Midi\//, '🌞 ')}</div>
+      ${items.map(item => `
+        <div class="stock-row">
+          <div class="stock-row-nom">${item.nom}</div>
+          ${!item.disponible ? '<span class="stock-row-tag">Rupture</span>' : ''}
+          <label class="stock-switch">
+            <input type="checkbox" ${item.disponible ? 'checked' : ''} onchange="toggleStockItem(${item.id}, this.checked)">
+            <span class="stock-slide"></span>
+          </label>
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+async function toggleStockItem(itemId, disponible) {
+  const item = _stockItems.find(i => i.id === itemId);
+  if (item) item.disponible = disponible;
+  renderStocksView();
+  await db.from('menu').update({ disponible }).eq('id', itemId);
 }
 </script>
 </body>
