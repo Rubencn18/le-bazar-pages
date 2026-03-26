@@ -175,6 +175,48 @@
     .qa-item .qa-desc { font-size: 9px; color: var(--muted); letter-spacing: .3px; margin-top: 1px; }
     .qa-item-inner { display: flex; flex-direction: column; }
 
+    /* ─── Tab Bar ─── */
+    #tab-bar {
+      display: flex; align-items: stretch;
+      height: 42px; flex-shrink: 0;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      padding: 0 20px; gap: 0;
+      overflow-x: auto; overflow-y: hidden;
+    }
+    #tab-bar::-webkit-scrollbar { height: 0; }
+    .tab-btn {
+      padding: 0 16px; background: transparent; border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--muted); font-size: 11px; font-weight: 600;
+      letter-spacing: 1px; text-transform: uppercase; cursor: pointer;
+      transition: color .15s, border-color .15s; white-space: nowrap;
+      display: flex; align-items: center; gap: 6px;
+      position: relative; font-family: inherit;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--orange); border-bottom-color: var(--orange); }
+
+    /* ─── Tool buttons ─── */
+    .tool-btn {
+      padding: 5px 10px; background: transparent;
+      border: 1px solid var(--border2); color: var(--muted);
+      cursor: pointer; font-size: 12px; font-family: inherit;
+      transition: all .15s; white-space: nowrap;
+      display: inline-flex; align-items: center; gap: 5px;
+    }
+    .tool-btn:hover { border-color: var(--orange); color: var(--orange); }
+    .tool-btn.active { border-color: var(--orange); color: var(--orange); }
+    .tool-btn.danger:hover { border-color: var(--red); color: var(--red); }
+    .header-tools { display: flex; align-items: center; gap: 6px; }
+
+    /* ─── Sidebar action row ─── */
+    #print-btn-group {
+      display: flex; align-items: center; gap: 6px;
+      padding: 0 14px 12px; flex-wrap: wrap;
+    }
+    #btn-new-resa { flex: 1; min-width: 160px; }
+
     /* ─── Main ─── */
     #app-main { display: flex; flex: 1; overflow: hidden; }
 
@@ -512,6 +554,8 @@
       .zone-tables { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
       .header-center .date-label { display: none; }
       .user-badge { display: none; }
+      .header-tools .btn-label { display: none; }
+      #btn-logout { display: none; }
       .form-row { grid-template-columns: 1fr; }
       .detail-grid { grid-template-columns: 1fr; }
       #toast-container { bottom: 12px; right: 12px; left: 12px; }
@@ -613,6 +657,33 @@
     .cap-pct { font-size:10px; color:var(--muted); width:32px; text-align:right; flex-shrink:0; }
     .cap-cfg-btn { font-size:10px; background:transparent; border:none; color:var(--muted); cursor:pointer; padding:0; }
     .cap-cfg-btn:hover { color:var(--orange); }
+
+    /* ── View section layouts ── */
+    .view-header {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 12px; margin-bottom: 20px;
+    }
+    .view-title { font-size: 18px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+    .view-subtitle { color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .view-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .view-search {
+      padding: 9px 14px; background: var(--surface2);
+      border: 1px solid var(--border2); color: var(--text);
+      width: 280px; font-size: 13px; outline: none; font-family: inherit;
+      transition: border-color .2s;
+    }
+    .view-search:focus { border-color: var(--orange); }
+
+    /* ── Filter buttons (commandes) ── */
+    .filter-btn {
+      padding: 6px 12px; background: transparent;
+      border: 1px solid var(--border2); color: var(--muted);
+      font-size: 10px; font-weight: 600; letter-spacing: 1px;
+      text-transform: uppercase; cursor: pointer; font-family: inherit;
+      transition: all .15s;
+    }
+    .filter-btn:hover { border-color: var(--orange); color: var(--orange); }
+    .filter-btn.active { background: var(--orange); border-color: var(--orange); color: #fff; }
 
     /* ── No-show badge ── */
     .badge-noshow { background: rgba(192,132,252,0.12); color: #c084fc; border: 1px solid rgba(192,132,252,0.3); }
@@ -789,22 +860,16 @@
       <input type="date" id="date-picker" />
       <span class="date-label" id="date-label"></span>
       <button class="nav-day-btn" id="btn-next-day">›</button>
-      <button id="btn-all-dates" onclick="toggleAllDates()" title="Voir toutes les réservations" style="padding:5px 10px;background:transparent;border:1px solid var(--border2);color:var(--muted);cursor:pointer;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-left:6px;transition:all .2s;">TOUT</button>
+      <button id="btn-all-dates" onclick="toggleAllDates()" title="Voir toutes les réservations" class="tool-btn" style="margin-left:6px;font-size:10px;font-weight:600;letter-spacing:1.5px;">TOUT</button>
     </div>
     <div class="header-right">
-      <div style="display:flex;gap:4px;margin-right:12px;">
-        <button id="tab-reservations" onclick="switchTab('reservations')" style="padding:7px 14px;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;border:1px solid var(--orange);background:var(--orange);color:#fff;cursor:pointer;">📅 Réservations</button>
-        <button id="tab-clients" onclick="switchTab('clients')" style="padding:7px 14px;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;">👤 Clients</button>
-        <button id="tab-stats" onclick="switchTab('stats')" style="padding:7px 14px;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;">📊 Stats</button>
-        <span id="tab-commandes-wrap"><button id="tab-commandes" onclick="switchTab('commandes')" style="padding:7px 14px;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;">🍽️ Commandes</button><span id="cmd-count-badge" style="display:none;position:absolute;top:-5px;right:-7px;background:var(--orange);color:#fff;border-radius:50%;width:17px;height:17px;font-size:10px;font-weight:700;align-items:center;justify-content:center;line-height:1;"></span></span>
-        <span id="tab-annulations-wrap"><button id="tab-annulations" onclick="switchTab('annulations')" style="padding:7px 14px;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;">❌ Annulations</button><span id="annul-count-badge" style="position:absolute;top:-5px;right:-7px;background:var(--red);color:#fff;border-radius:50%;width:17px;height:17px;font-size:10px;font-weight:700;display:none;align-items:center;justify-content:center;line-height:1;"></span></span>
-      </div>
-      <button onclick="toggleEditMode()" title="Modifier le plan de salle" id="btn-edit-plan" style="padding:7px 10px;background:transparent;border:1px solid var(--border2);color:var(--muted);cursor:pointer;font-size:13px;" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="if(!window.editModeOn){this.style.borderColor='var(--border2)';this.style.color='var(--muted)'}">⚙️ Plan</button>
-      <button onclick="showQRCode()" title="QR Code formulaire public" style="padding:7px 10px;background:transparent;border:1px solid var(--border2);color:var(--muted);cursor:pointer;font-size:13px;" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">📱 QR</button>
-      <button onclick="openBlocagesModal()" title="Blocage de créneaux" style="padding:7px 10px;background:transparent;border:1px solid var(--border2);color:var(--muted);cursor:pointer;font-size:13px;" onmouseover="this.style.borderColor='var(--red)';this.style.color='var(--red)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">🚫 Blocages</button>
-      <!-- Quick Access -->
-      <div class="quick-access" id="quick-access-wrap">
-        <button id="btn-quick-access" onclick="toggleQuickAccess(event)">🔗 Accès ▾</button>
+      <div class="header-tools">
+        <button onclick="toggleEditMode()" title="Modifier le plan de salle" id="btn-edit-plan" class="tool-btn">⚙️ <span class="btn-label">Plan</span></button>
+        <button onclick="showQRCode()" title="QR Code formulaire public" class="tool-btn">📱 <span class="btn-label">QR</span></button>
+        <button onclick="openBlocagesModal()" title="Blocage de créneaux" class="tool-btn danger">🚫 <span class="btn-label">Blocages</span></button>
+        <!-- Quick Access -->
+        <div class="quick-access" id="quick-access-wrap">
+          <button id="btn-quick-access" onclick="toggleQuickAccess(event)" class="tool-btn">🔗 <span class="btn-label">Accès</span> ▾</button>
         <div class="quick-access-dropdown" id="quick-access-dropdown">
           <div class="qa-label">Outils opérationnels</div>
           <a class="qa-item" href="le-bazar-serveur.html" target="_blank">
@@ -836,11 +901,27 @@
             </div>
           </a>
         </div>
-      </div>
+        </div><!-- /.quick-access -->
+      </div><!-- /.header-tools -->
       <span class="user-badge" id="user-badge"></span>
       <button id="btn-logout">Déconnexion</button>
     </div>
   </header>
+
+  <!-- Tab bar -->
+  <nav id="tab-bar">
+    <button id="tab-reservations" class="tab-btn active" onclick="switchTab('reservations')">📅 Réservations</button>
+    <button id="tab-clients" class="tab-btn" onclick="switchTab('clients')">👤 Clients</button>
+    <button id="tab-stats" class="tab-btn" onclick="switchTab('stats')">📊 Stats</button>
+    <span id="tab-commandes-wrap" style="position:relative;display:flex;">
+      <button id="tab-commandes" class="tab-btn" onclick="switchTab('commandes')">🍽️ Commandes</button>
+      <span id="cmd-count-badge" style="position:absolute;top:6px;right:4px;background:var(--orange);color:#fff;border-radius:50%;width:15px;height:15px;font-size:9px;font-weight:700;display:none;align-items:center;justify-content:center;line-height:1;"></span>
+    </span>
+    <span id="tab-annulations-wrap" style="position:relative;display:flex;">
+      <button id="tab-annulations" class="tab-btn" onclick="switchTab('annulations')">❌ Annulations</button>
+      <span id="annul-count-badge" style="position:absolute;top:6px;right:4px;background:var(--red);color:#fff;border-radius:50%;width:15px;height:15px;font-size:9px;font-weight:700;display:none;align-items:center;justify-content:center;line-height:1;"></span>
+    </span>
+  </nav>
 
   <!-- Main -->
   <div id="app-main">
@@ -888,12 +969,12 @@
         <div class="ph-meta" id="ph-meta"></div>
       </div>
 
-      <div id="print-btn-group" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <div id="print-btn-group">
         <button id="btn-new-resa">＋ Nouvelle réservation</button>
-        <button onclick="printService()" title="Imprimer la fiche de service" style="padding:9px 10px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-size:12px;cursor:pointer;" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">🖨️</button>
-        <button onclick="exportCSV('reservations')" title="Exporter les réservations CSV" style="padding:9px 10px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-size:12px;cursor:pointer;" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">⬇️ CSV</button>
-        <button id="btn-toggle-cancelled" style="padding:9px 12px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-size:11px;font-weight:600;letter-spacing:1px;cursor:pointer;transition:all .2s;display:none;" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="if(!window.showCancelled){this.style.borderColor='var(--border2)';this.style.color='var(--muted)'}">👁 Annulées</button>
-        <button id="btn-clear-cancelled" title="Supprimer toutes les réservations annulées" style="padding:9px 12px;background:transparent;border:1px solid rgba(224,80,80,0.4);color:var(--red);font-size:11px;font-weight:600;letter-spacing:1px;cursor:pointer;transition:all .2s;display:none;" onmouseover="this.style.background='var(--red-dim)'" onmouseout="this.style.background='transparent'">🗑️ Vider</button>
+        <button onclick="printService()" title="Imprimer la fiche de service" class="tool-btn">🖨️</button>
+        <button onclick="exportCSV('reservations')" title="Exporter les réservations CSV" class="tool-btn">⬇️ CSV</button>
+        <button id="btn-toggle-cancelled" class="tool-btn" style="display:none;">👁 Annulées</button>
+        <button id="btn-clear-cancelled" class="tool-btn danger" title="Supprimer toutes les réservations annulées" style="display:none;">🗑️ Vider</button>
       </div>
       <div class="service-filter">
         <button class="service-btn active" data-service="all">Tous</button>
@@ -917,16 +998,16 @@
 
   <!-- ══ VUE STATS ══ -->
   <div id="view-stats">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
-      <div style="font-size:18px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">📊 Statistiques</div>
-      <div style="display:flex;align-items:center;gap:10px;font-size:13px;">
-        <span style="color:var(--muted)">Ticket moyen :</span>
+    <div class="view-header">
+      <div class="view-title">📊 Statistiques</div>
+      <div class="view-actions">
+        <span style="color:var(--muted);font-size:13px;">Ticket moyen :</span>
         <input type="number" id="ticket-moyen" min="0" step="5" value="35"
-          style="width:72px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:6px 10px;font-size:13px;font-family:inherit;outline:none;text-align:right;"
+          style="width:72px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:6px 10px;font-size:13px;font-family:inherit;outline:none;text-align:right;transition:border-color .2s;"
           onfocus="this.style.borderColor='var(--orange)'" onblur="this.style.borderColor='var(--border2)'"
           oninput="localStorage.setItem('bazar-ticket-moyen',this.value);renderStats(window._lastStatsResas||[],window._lastStatsClients||[])" />
-        <span style="color:var(--muted)">€ / couvert</span>
-        <button onclick="exportCSV('clients')" style="padding:7px 12px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-size:12px;cursor:pointer;margin-left:8px;" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">⬇️ Export clients</button>
+        <span style="color:var(--muted);font-size:13px;">€ / couvert</span>
+        <button onclick="exportCSV('clients')" class="tool-btn">⬇️ Export clients</button>
       </div>
     </div>
     <div class="stats-kpi-grid" id="stats-kpis"></div>
@@ -946,16 +1027,15 @@
 
   <!-- ══ VUE CLIENTS ══ -->
   <div id="view-clients" style="display:none;flex:1;overflow:auto;padding:24px 32px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+    <div class="view-header">
       <div>
-        <div style="font-size:18px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">👤 Base clients</div>
-        <div style="color:var(--muted);font-size:12px;margin-top:4px;" id="clients-count">Chargement…</div>
+        <div class="view-title">👤 Base clients</div>
+        <div class="view-subtitle" id="clients-count">Chargement…</div>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <button onclick="exportCSV('clients')" style="padding:8px 14px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-size:12px;cursor:pointer;white-space:nowrap;" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">⬇️ Export CSV</button>
-        <input id="clients-search" type="text" placeholder="Rechercher nom, téléphone, email…"
-        style="padding:9px 14px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);width:280px;font-size:13px;outline:none;"
-        oninput="filterClients(this.value)" onfocus="this.style.borderColor='var(--orange)'" onblur="this.style.borderColor='var(--border2)'" />
+      <div class="view-actions">
+        <button onclick="exportCSV('clients')" class="tool-btn">⬇️ Export CSV</button>
+        <input id="clients-search" type="text" class="view-search" placeholder="Rechercher nom, téléphone, email…"
+          oninput="filterClients(this.value)" />
       </div>
     </div>
     <table id="clients-table" style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -983,17 +1063,17 @@
 
   <!-- ══ VUE COMMANDES ══ -->
   <div id="view-commandes">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+    <div class="view-header">
       <div>
-        <div style="font-size:18px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">🍽️ Commandes en cours</div>
-        <div style="color:var(--muted);font-size:12px;margin-top:4px;" id="cmd-count-label">Chargement…</div>
+        <div class="view-title">🍽️ Commandes en cours</div>
+        <div class="view-subtitle" id="cmd-count-label">Chargement…</div>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-        <button id="cmd-filter-all"  onclick="setCmdFilter('all')"             style="padding:6px 12px;background:var(--orange);border:1px solid var(--orange);color:#fff;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">Tout</button>
-        <button id="cmd-filter-att"  onclick="setCmdFilter('En attente')"      style="padding:6px 12px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">En attente</button>
-        <button id="cmd-filter-prep" onclick="setCmdFilter('En préparation')"  style="padding:6px 12px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">En prép.</button>
-        <button id="cmd-filter-pret" onclick="setCmdFilter('Prêt')"            style="padding:6px 12px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">Prêt</button>
-        <button onclick="loadCommandes()" style="padding:6px 12px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-size:12px;cursor:pointer;" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">🔄 Actualiser</button>
+      <div class="view-actions">
+        <button id="cmd-filter-all"  onclick="setCmdFilter('all')"            class="filter-btn active">Tout</button>
+        <button id="cmd-filter-att"  onclick="setCmdFilter('En attente')"     class="filter-btn">En attente</button>
+        <button id="cmd-filter-prep" onclick="setCmdFilter('En préparation')" class="filter-btn">En prép.</button>
+        <button id="cmd-filter-pret" onclick="setCmdFilter('Prêt')"           class="filter-btn">Prêt</button>
+        <button onclick="loadCommandes()" class="tool-btn">🔄 Actualiser</button>
       </div>
     </div>
     <div class="cmd-board" id="cmd-board">
@@ -2018,15 +2098,8 @@ window.showCancelled = false;
 document.getElementById('btn-toggle-cancelled').addEventListener('click', () => {
   window.showCancelled = !window.showCancelled;
   const btn = document.getElementById('btn-toggle-cancelled');
-  if (window.showCancelled) {
-    btn.style.borderColor = 'var(--orange)';
-    btn.style.color = 'var(--orange)';
-    btn.textContent = '👁 Masquer annulées';
-  } else {
-    btn.style.borderColor = 'var(--border2)';
-    btn.style.color = 'var(--muted)';
-    btn.textContent = '👁 Annulées';
-  }
+  btn.classList.toggle('active', window.showCancelled);
+  btn.textContent = window.showCancelled ? '👁 Masquer annulées' : '👁 Annulées';
   renderReservationList();
 });
 
@@ -2133,10 +2206,7 @@ function switchTab(tab) {
   tabs.forEach(t => {
     const btn = document.getElementById('tab-' + t);
     if (!btn) return;
-    const active = t === tab;
-    btn.style.background   = active ? 'var(--orange)' : 'transparent';
-    btn.style.color        = active ? '#fff' : 'var(--muted)';
-    btn.style.borderColor  = active ? 'var(--orange)' : 'var(--border2)';
+    btn.classList.toggle('active', t === tab);
   });
   if (tab === 'clients')     loadClients();
   if (tab === 'stats')       loadStats();
@@ -2627,10 +2697,7 @@ function toggleEditMode() {
   const banner = document.getElementById('edit-mode-banner');
   fp.classList.toggle('edit-mode', window.editModeOn);
   banner.style.display = window.editModeOn ? '' : 'none';
-  if (btn) {
-    btn.style.borderColor = window.editModeOn ? 'var(--orange)' : '';
-    btn.style.color = window.editModeOn ? 'var(--orange)' : '';
-  }
+  if (btn) btn.classList.toggle('active', window.editModeOn);
   renderFloorPlan(); // re-render to add/remove edit buttons
 }
 
@@ -3216,11 +3283,7 @@ function setCmdFilter(f) {
   const map = { all:'cmd-filter-all', 'En attente':'cmd-filter-att', 'En préparation':'cmd-filter-prep', 'Prêt':'cmd-filter-pret' };
   ['cmd-filter-all','cmd-filter-att','cmd-filter-prep','cmd-filter-pret'].forEach(id => {
     const el = document.getElementById(id);
-    if (!el) return;
-    const isActive = map[f] === id;
-    el.style.background  = isActive ? 'var(--orange)' : 'transparent';
-    el.style.borderColor = isActive ? 'var(--orange)' : 'var(--border2)';
-    el.style.color       = isActive ? '#fff' : 'var(--muted)';
+    if (el) el.classList.toggle('active', map[f] === id);
   });
   renderCommandes();
 }
