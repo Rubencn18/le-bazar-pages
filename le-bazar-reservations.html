@@ -3472,42 +3472,107 @@ function startCmdPolling() {
 // 📦 GESTION DES STOCKS
 // ═══════════════════════════════════════════
 let _stockItems = [];
+let _stockIngredients = [];
+let _menuIngrMap = {}; // ingredient_id → [menu_ids]
+let _itemIngrMap = {}; // menu_id       → [ingredient_ids]
 
 async function loadStocksView() {
   document.getElementById('stocks-grid').innerHTML = '<div style="color:var(--muted);padding:20px">Chargement…</div>';
-  const { data } = await db.from('menu').select('id,nom,categorie,disponible').order('categorie').order('ordre');
-  _stockItems = data || [];
+  const [menuRes, ingrRes, linkRes] = await Promise.all([
+    db.from('menu').select('id,nom,categorie,disponible').order('categorie').order('ordre'),
+    db.from('ingredients').select('id,nom,disponible').order('nom'),
+    db.from('menu_ingredients').select('menu_id,ingredient_id')
+  ]);
+  _stockItems       = menuRes.data || [];
+  _stockIngredients = ingrRes.data || [];
+  _menuIngrMap = {}; _itemIngrMap = {};
+  (linkRes.data || []).forEach(({ menu_id, ingredient_id }) => {
+    if (!_menuIngrMap[ingredient_id]) _menuIngrMap[ingredient_id] = [];
+    _menuIngrMap[ingredient_id].push(menu_id);
+    if (!_itemIngrMap[menu_id]) _itemIngrMap[menu_id] = [];
+    _itemIngrMap[menu_id].push(ingredient_id);
+  });
   renderStocksView();
 }
 
 function renderStocksView() {
-  const ruptures = _stockItems.filter(i => !i.disponible).length;
+  const ingrRuptures    = _stockIngredients.filter(i => !i.disponible).length;
+  const linkedIds       = new Set(Object.keys(_itemIngrMap).map(Number));
+  const manualRuptures  = _stockItems.filter(m => !m.disponible && !linkedIds.has(m.id)).length;
+  const totalRuptures   = ingrRuptures + manualRuptures;
+
   const bar = document.getElementById('stocks-rupture-bar');
-  bar.style.display = ruptures > 0 ? 'block' : 'none';
-  document.getElementById('stocks-rupture-count').textContent = ruptures;
+  bar.style.display = totalRuptures > 0 ? 'block' : 'none';
+  document.getElementById('stocks-rupture-count').textContent = totalRuptures;
   document.getElementById('stocks-subtitle').textContent =
-    ruptures > 0 ? `${ruptures} rupture${ruptures > 1 ? 's' : ''}` : 'Tous les plats sont disponibles';
+    totalRuptures > 0 ? `${totalRuptures} rupture${totalRuptures > 1 ? 's' : ''}` : 'Tous les ingrédients sont disponibles';
 
-  const cats = {};
-  _stockItems.forEach(item => {
-    const cat = item.categorie || 'Autre';
-    if (!cats[cat]) cats[cat] = [];
-    cats[cat].push(item);
-  });
-
-  document.getElementById('stocks-grid').innerHTML = Object.entries(cats).map(([cat, items]) => `
-    <div class="stocks-cat-block">
-      <div class="stocks-cat-title">${cat.replace(/^Midi\//, '🌞 ')}</div>
-      ${items.map(item => `
-        <div class="stock-row">
-          <div class="stock-row-nom">${item.nom}</div>
-          ${!item.disponible ? '<span class="stock-row-tag">Rupture</span>' : ''}
+  // Bloc ingrédients clés
+  const ingrBlock = `
+    <div class="stocks-cat-block" style="width:320px">
+      <div class="stocks-cat-title" style="color:var(--orange)">🧂 Ingrédients clés</div>
+      ${_stockIngredients.map(ingr => {
+        const n = (_menuIngrMap[ingr.id] || []).length;
+        return `<div class="stock-row">
+          <div class="stock-row-nom">${ingr.nom} <span style="font-size:10px;color:var(--muted);font-weight:400">${n} plat${n>1?'s':''}</span></div>
+          ${!ingr.disponible ? '<span class="stock-row-tag">Rupture</span>' : ''}
           <label class="stock-switch">
-            <input type="checkbox" ${item.disponible ? 'checked' : ''} onchange="toggleStockItem(${item.id}, this.checked)">
+            <input type="checkbox" ${ingr.disponible?'checked':''} onchange="toggleStockIngredient(${ingr.id},this.checked)">
             <span class="stock-slide"></span>
           </label>
-        </div>`).join('')}
+        </div>`;
+      }).join('')}
+    </div>`;
+
+  // Blocs autres plats (non liés)
+  const manualItems = _stockItems.filter(m => !linkedIds.has(m.id));
+  const cats = {};
+  manualItems.forEach(m => { const c = m.categorie||'Autre'; if (!cats[c]) cats[c]=[]; cats[c].push(m); });
+  const manualBlocks = Object.entries(cats).map(([cat, items]) => `
+    <div class="stocks-cat-block">
+      <div class="stocks-cat-title">${cat.replace(/^Midi\//,'🌞 ')}</div>
+      ${items.map(item => `<div class="stock-row">
+        <div class="stock-row-nom">${item.nom}</div>
+        ${!item.disponible ? '<span class="stock-row-tag">Rupture</span>' : ''}
+        <label class="stock-switch">
+          <input type="checkbox" ${item.disponible?'checked':''} onchange="toggleStockItem(${item.id},this.checked)">
+          <span class="stock-slide"></span>
+        </label>
+      </div>`).join('')}
     </div>`).join('');
+
+  document.getElementById('stocks-grid').innerHTML = ingrBlock + manualBlocks;
+}
+
+async function toggleStockIngredient(ingrId, disponible) {
+  const ingr = _stockIngredients.find(i => i.id === ingrId);
+  if (ingr) ingr.disponible = disponible;
+  const affected = _menuIngrMap[ingrId] || [];
+  affected.forEach(mid => {
+    const item = _stockItems.find(m => m.id === mid);
+    if (!item) return;
+    if (!disponible) {
+      item.disponible = false;
+    } else {
+      const allOk = (_itemIngrMap[mid] || []).every(iid => {
+        const i = _stockIngredients.find(x => x.id === iid);
+        return i ? i.disponible : true;
+      });
+      if (allOk) item.disponible = true;
+    }
+  });
+  renderStocksView();
+  await db.from('ingredients').update({ disponible }).eq('id', ingrId);
+  if (affected.length > 0) {
+    if (!disponible) {
+      await db.from('menu').update({ disponible: false }).in('id', affected);
+    } else {
+      const toEnable = affected.filter(mid =>
+        (_itemIngrMap[mid] || []).every(iid => { const i = _stockIngredients.find(x=>x.id===iid); return i?i.disponible:true; })
+      );
+      if (toEnable.length > 0) await db.from('menu').update({ disponible: true }).in('id', toEnable);
+    }
+  }
 }
 
 async function toggleStockItem(itemId, disponible) {
