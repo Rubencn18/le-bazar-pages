@@ -88,20 +88,20 @@
       animation:card-in .25s ease both;
       transform-origin:center;transition:transform .2s,box-shadow .2s;
     }
-    /* Fond de la carte via ::after */
-    .item-card::after{
-      content:'';position:absolute;inset:1px;border-radius:7px;
-      background:var(--surface2);z-index:0;transition:background .2s;
-    }
-    /* Bordure rotative via ::before */
+    /* Bordure rotative via ::before — derrière tout */
     .item-card::before{
       content:'';position:absolute;
       width:150%;height:150%;top:-25%;left:-25%;
       background:conic-gradient(transparent 0deg,transparent 200deg,var(--orange) 250deg,#ff9500 280deg,transparent 320deg);
-      opacity:0;transition:opacity .3s;z-index:0;
-      /* pas d'animation par défaut */
+      opacity:0;transition:opacity .3s;z-index:1;
     }
-    .item-card > *{position:relative;z-index:1}
+    /* Fond de la carte via ::after — au-dessus de la bordure */
+    .item-card::after{
+      content:'';position:absolute;inset:1px;border-radius:7px;
+      background:var(--surface2);z-index:2;transition:background .2s;
+    }
+    /* Contenu — au-dessus du fond */
+    .item-card > *{position:relative;z-index:3;}
     .item-card:hover{transform:scale(1.02);box-shadow:0 6px 24px rgba(255,102,20,0.18)}
     .item-card:hover::before{opacity:1;animation:spin-border 2s linear infinite}
     .item-card.in-cart::before{opacity:1;animation:spin-border 1.5s linear infinite}
