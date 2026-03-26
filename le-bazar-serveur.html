@@ -61,36 +61,68 @@
     }
     #cat-nav::-webkit-scrollbar{display:none}
     .cat-btn{
-      flex-shrink:0;padding:6px 14px;background:transparent;border:1px solid var(--border2);
-      color:var(--muted);font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;
-      transition:all .15s;white-space:nowrap;
+      flex-shrink:0;padding:6px 18px;background:transparent;border:1px solid var(--border2);
+      border-radius:20px;color:var(--muted);font-size:11px;font-weight:600;letter-spacing:1px;
+      text-transform:uppercase;transition:all .2s;white-space:nowrap;
     }
-    .cat-btn.active{background:var(--orange);border-color:var(--orange);color:#fff}
+    .cat-btn.active{
+      background:linear-gradient(135deg,var(--orange),#ff9500);
+      border-color:transparent;color:#fff;
+      box-shadow:0 0 14px rgba(255,102,20,0.5);
+    }
     .cat-btn:hover:not(.active){border-color:var(--orange);color:var(--orange)}
 
     /* ── ITEMS GRID ── */
     #items-grid{
       flex:1;overflow-y:auto;padding:12px;
-      display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;
+      display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;
       align-content:start;
     }
+    @keyframes card-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes spin-border{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
     .item-card{
-      background:var(--surface2);border:1px solid var(--border);
-      padding:14px 12px;cursor:pointer;transition:all .15s;position:relative;
+      position:relative;overflow:hidden;
+      padding:14px 12px;cursor:pointer;border-radius:8px;
       display:flex;flex-direction:column;gap:4px;
+      animation:card-in .25s ease both;
+      transform-origin:center;transition:transform .2s,box-shadow .2s;
     }
-    .item-card:hover{background:var(--surface3);border-color:var(--orange)}
-    .item-card.in-cart{border-color:var(--orange);background:var(--orange-dim)}
+    /* Fond de la carte via ::after */
+    .item-card::after{
+      content:'';position:absolute;inset:1px;border-radius:7px;
+      background:var(--surface2);z-index:0;transition:background .2s;
+    }
+    /* Bordure rotative via ::before */
+    .item-card::before{
+      content:'';position:absolute;
+      width:150%;height:150%;top:-25%;left:-25%;
+      background:conic-gradient(transparent 0deg,transparent 200deg,var(--orange) 250deg,#ff9500 280deg,transparent 320deg);
+      opacity:0;transition:opacity .3s;z-index:0;
+      /* pas d'animation par défaut */
+    }
+    .item-card > *{position:relative;z-index:1}
+    .item-card:hover{transform:scale(1.02);box-shadow:0 6px 24px rgba(255,102,20,0.18)}
+    .item-card:hover::before{opacity:1;animation:spin-border 2s linear infinite}
+    .item-card.in-cart::before{opacity:1;animation:spin-border 1.5s linear infinite}
+    .item-card.in-cart::after{background:var(--orange-dim)}
     .item-card.dispo-false{opacity:.4;cursor:not-allowed}
+
     .item-emoji{font-size:22px;margin-bottom:4px}
     .item-nom{font-size:12px;font-weight:600;line-height:1.3}
     .item-desc{font-size:10px;color:var(--muted);line-height:1.4;margin-top:2px}
-    .item-prix{font-size:13px;font-weight:700;color:var(--orange);margin-top:auto;padding-top:8px}
+    .item-prix{
+      display:inline-block;margin-top:auto;padding-top:8px;
+      font-size:12px;font-weight:700;color:#fff;
+      background:linear-gradient(135deg,var(--orange),#ff9500);
+      border-radius:12px;padding:3px 10px;margin-top:8px;align-self:flex-start;
+    }
     .item-qty-badge{
-      position:absolute;top:6px;right:8px;
-      background:var(--orange);color:#fff;border-radius:50%;
-      width:20px;height:20px;font-size:11px;font-weight:700;
+      position:absolute;top:7px;right:8px;z-index:2;
+      background:linear-gradient(135deg,var(--orange),#ff9500);color:#fff;border-radius:50%;
+      width:22px;height:22px;font-size:11px;font-weight:700;
       display:none;align-items:center;justify-content:center;
+      box-shadow:0 2px 8px rgba(255,102,20,0.6);
     }
 
     /* ── CART SIDE ── */
