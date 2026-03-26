@@ -75,6 +75,45 @@
   .already-card { border-color: rgba(56,189,248,0.4); background: var(--blue-dim); }
   .already-card .state-title { color: var(--blue); }
 
+  /* Recherche manuelle */
+  .search-form { text-align: left; }
+  .search-label { font-size: 0.75rem; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; display: block; margin-bottom: 8px; }
+  .search-input {
+    width: 100%; padding: 12px 14px;
+    background: #111; border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px; font-size: 1rem;
+    outline: none; transition: border-color .2s; font-family: inherit;
+  }
+  .search-input:focus { border-color: var(--brand); }
+  .search-btn {
+    width: 100%; margin-top: 10px; padding: 13px;
+    background: var(--brand); color: #fff; border: none;
+    border-radius: 8px; font-size: 0.95rem; font-weight: 700;
+    cursor: pointer; transition: opacity .2s; letter-spacing: 0.5px;
+  }
+  .search-btn:hover { opacity: .85; }
+  .search-btn:disabled { opacity: .5; cursor: not-allowed; }
+  .result-list { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; text-align: left; }
+  .result-item {
+    background: #111; border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .result-item.already { border-color: rgba(56,189,248,0.35); opacity: .65; }
+  .result-info { flex: 1; min-width: 0; }
+  .result-name { font-weight: 700; font-size: 1rem; }
+  .result-meta { font-size: 0.8rem; color: var(--muted); margin-top: 3px; }
+  .btn-mini {
+    padding: 8px 14px; border: none; border-radius: 6px;
+    font-size: 0.8rem; font-weight: 700; cursor: pointer;
+    transition: opacity .2s; white-space: nowrap; flex-shrink: 0;
+  }
+  .btn-mini:hover { opacity: .85; }
+  .btn-mini:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-mini-green { background: var(--green); color: #fff; }
+  .btn-mini-grey { background: #333; color: var(--muted); cursor: default; }
+  .no-results { text-align: center; color: var(--muted); font-size: 0.875rem; padding: 16px 0; }
+
   .spinner {
     border: 3px solid var(--border); border-top-color: var(--brand);
     border-radius: 50%; width: 40px; height: 40px;
@@ -127,7 +166,7 @@ async function init() {
   const content = document.getElementById('content');
 
   if (!id) {
-    content.innerHTML = `<div class="icon-big">❌</div><p class="state-title" style="color:var(--red)">Lien invalide</p>`;
+    showSearchMode(content);
     return;
   }
 
@@ -217,6 +256,98 @@ async function doCheckin(id) {
   } catch(e) {
     btn.disabled = false;
     btn.textContent = '✅ Confirmer l\'arrivée';
+    alert('Erreur : ' + e.message);
+  }
+}
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function showSearchMode(content) {
+  content.innerHTML = `
+    <div class="search-form">
+      <label class="search-label" for="search-input">Nom ou téléphone du client</label>
+      <input id="search-input" class="search-input" type="text" placeholder="ex: Dupont ou 06 12 34 56 78" autocomplete="off" />
+      <button class="search-btn" id="search-btn" onclick="searchResa()">🔍 Rechercher</button>
+      <div id="search-results"></div>
+    </div>`;
+  document.getElementById('search-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') searchResa();
+  });
+  document.getElementById('search-input').focus();
+}
+
+async function searchResa() {
+  const q = (document.getElementById('search-input').value || '').trim();
+  const btn = document.getElementById('search-btn');
+  const results = document.getElementById('search-results');
+  if (!q) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Recherche…';
+  results.innerHTML = '';
+
+  try {
+    const today = todayISO();
+    // Cherche par nom OU téléphone sur la date du jour
+    const byName  = await sbFetch(`reservations?date_reservation=eq.${today}&nom_client=ilike.*${encodeURIComponent(q)}*&select=*&order=heure.asc`);
+    const byPhone = await sbFetch(`reservations?date_reservation=eq.${today}&telephone=ilike.*${encodeURIComponent(q)}*&select=*&order=heure.asc`);
+
+    // Dédoublonner par ID
+    const map = new Map();
+    [...(byName||[]), ...(byPhone||[])].forEach(r => map.set(r.id, r));
+    const list = [...map.values()];
+
+    if (list.length === 0) {
+      results.innerHTML = `<p class="no-results">Aucune réservation trouvée aujourd'hui pour "<strong>${q}</strong>"</p>`;
+    } else {
+      results.innerHTML = `<div class="result-list">${list.map(r => {
+        const done = r.statut === 'Arrivé';
+        const cancelled = r.statut === 'Annulée' || r.statut === 'No-show';
+        const statusTxt = cancelled ? r.statut : (done ? '✅ Déjà arrivé' : '');
+        return `<div class="result-item${done ? ' already' : ''}" id="ri-${r.id}">
+          <div class="result-info">
+            <div class="result-name">${r.nom_client || '—'}</div>
+            <div class="result-meta">${(r.heure||'').substring(0,5)} · ${r.nombre_personnes} pers. · Table ${r.table_assignee||'—'}${statusTxt ? ' · <span style="color:var(--green)">' + statusTxt + '</span>' : ''}</div>
+          </div>
+          ${!done && !cancelled
+            ? `<button class="btn-mini btn-mini-green" id="mbtn-${r.id}" onclick="doMiniCheckin('${r.id}')">✅ Check-in</button>`
+            : `<span class="btn-mini btn-mini-grey">${cancelled ? r.statut : 'Arrivé'}</span>`
+          }
+        </div>`;
+      }).join('')}</div>`;
+    }
+  } catch(e) {
+    results.innerHTML = `<p class="no-results" style="color:var(--red)">Erreur : ${e.message}</p>`;
+  }
+
+  btn.disabled = false;
+  btn.textContent = '🔍 Rechercher';
+}
+
+async function doMiniCheckin(id) {
+  const btn = document.getElementById('mbtn-' + id);
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    await sbFetch(`reservations?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ statut: 'Arrivé' })
+    });
+    btn.textContent = '✅ Arrivé';
+    btn.classList.remove('btn-mini-green');
+    btn.classList.add('btn-mini-grey');
+    const item = document.getElementById('ri-' + id);
+    if (item) {
+      item.classList.add('already');
+      const meta = item.querySelector('.result-meta');
+      if (meta) meta.innerHTML += ' · <span style="color:var(--green)">✅ Déjà arrivé</span>';
+    }
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = '✅ Check-in';
     alert('Erreur : ' + e.message);
   }
 }
