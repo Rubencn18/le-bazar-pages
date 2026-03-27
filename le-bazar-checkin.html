@@ -209,7 +209,10 @@ async function init() {
   const content = document.getElementById('content');
 
   if (!token && !id) {
-    content.innerHTML = `<div class="icon-big">🔍</div><p class="state-title" style="color:var(--muted)">Aucune réservation</p><p class="state-sub">Scannez le QR code depuis l'email de confirmation.</p>`;
+    content.innerHTML = `
+      <div class="icon-big">📧</div>
+      <p class="state-title" style="color:var(--muted)">Lien invalide</p>
+      <p class="state-sub">Ce lien doit être ouvert en scannant le QR code depuis l'email de confirmation de réservation.</p>`;
     return;
   }
 
