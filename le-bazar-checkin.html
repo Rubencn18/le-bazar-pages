@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le Bazar – Check-in</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --brand: #ff6614; --green: #22c55e; --red: #ef4444;
+    --bg: #111; --card: #1a1a1a; --border: #2a2a2a;
+    --text: #f0f0f0; --muted: #888;
+  }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+    justify-content: flex-start; padding: 20px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    padding: 32px 28px; width: 100%; max-width: 420px; margin-top: 20px;
+  }
+  .card.success-card { border-color: rgba(34,197,94,0.4); }
+  .card.already-card { border-color: rgba(56,189,248,0.4); }
+  .card.error-card   { border-color: rgba(239,68,68,0.4); }
+  .logo { font-size: 1.5rem; font-weight: 900; letter-spacing: 2px; color: var(--brand); text-align: center; }
+  .sub  { text-align: center; color: var(--muted); font-size: 0.8rem; margin-top: 4px; margin-bottom: 24px; letter-spacing: 1px; text-transform: uppercase; }
+
+  .resa-card { background: rgba(255,102,20,0.07); border: 1px solid rgba(255,102,20,0.2);
+    border-radius: 10px; padding: 16px; margin-bottom: 20px; }
+  .resa-name { font-size: 1.2rem; font-weight: 800; margin-bottom: 10px; }
+  .resa-row  { display: flex; justify-content: space-between; align-items: center;
+    padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.85rem; }
+  .resa-row:last-child { border-bottom: none; }
+  .resa-label { color: var(--muted); }
+  .resa-val   { font-weight: 600; }
+  .occasion-badge { background: rgba(255,102,20,0.2); color: var(--brand);
+    border-radius: 20px; padding: 3px 10px; font-size: 0.75rem; font-weight: 700; }
+
+  /* PIN */
+  .pin-label { text-align: center; color: var(--muted); font-size: 0.85rem; margin-bottom: 14px; }
+  .pin-wrap   { display: flex; gap: 12px; justify-content: center; margin-bottom: 16px; }
+  .pin-digit  {
+    width: 56px; height: 64px; background: #222; border: 2px solid var(--border);
+    border-radius: 10px; font-size: 1.6rem; font-weight: 700; text-align: center;
+    color: var(--text); caret-color: var(--brand); outline: none; transition: border-color .2s;
+  }
+  .pin-digit:focus { border-color: var(--brand); }
+  .pin-digit.filled { border-color: rgba(255,102,20,0.5); }
+  .pin-error  { text-align: center; color: var(--red); font-size: 0.85rem; margin-bottom: 12px;
+    min-height: 20px; }
+  .btn-confirm {
+    width: 100%; padding: 16px; background: var(--green); border: none; border-radius: 10px;
+    font-size: 1rem; font-weight: 800; color: #fff; cursor: pointer; transition: opacity .2s; letter-spacing: 0.5px;
+  }
+  .btn-confirm:hover  { opacity: .88; }
+  .btn-confirm:disabled { opacity: .4; cursor: not-allowed; }
+
+  .icon-big   { font-size: 3rem; text-align: center; margin-bottom: 12px; }
+  .state-title { font-size: 1.3rem; font-weight: 800; text-align: center; margin-bottom: 6px; }
+  .state-sub   { text-align: center; color: var(--muted); font-size: 0.875rem; margin-bottom: 20px; }
+
+  .spinner {
+    border: 3px solid var(--border); border-top-color: var(--brand);
+    border-radius: 50%; width: 40px; height: 40px;
+    animation: spin .7s linear infinite; margin: 20px auto;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  footer { margin-top: 20px; color: var(--muted); font-size: 0.72rem; text-align: center; }
+
+  @media (max-width: 440px) {
+    body { padding: 12px; }
+    .card { padding: 24px 18px; border-radius: 12px; }
+    .pin-digit { width: 48px; height: 58px; font-size: 1.4rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="card" id="card">
+  <div class="logo">LE BAZAR</div>
+  <div class="sub">Check-in réservation</div>
+  <div id="content"><div class="spinner"></div></div>
+</div>
+
+<footer>25 Av. de l'Europe, 92300 Levallois-Perret · Tél. 01 47 58 00 73</footer>
+
+<script>
+const SUPABASE_URL = 'https://gtjvsrhblqwwnviledmo.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd0anZzcmhibHF3d252aWxlZG1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDE2OTY1NiwiZXhwIjoyMDg5NzQ1NjU2fQ.KScIJzmVLYZ_P9Z8vSOvD9qL7fY38a_ESMtKXDnVE8s';
+const PIN = '2652';
+
+async function sbFetch(endpoint, opts = {}) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Prefer': 'return=representation',
+      ...(opts.headers || {})
+    }
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+function formatDate(d) {
+  if (!d) return '—';
+  const [y, m, j] = d.split('-');
+  const months = ['jan','fév','mar','avr','mai','juin','juil','août','sep','oct','nov','déc'];
+  return `${parseInt(j)} ${months[parseInt(m)-1]} ${y}`;
+}
+
+function buildResaInfo(r) {
+  return `
+    <div class="resa-card">
+      <div class="resa-name">${r.nom_client || '—'}</div>
+      <div class="resa-row"><span class="resa-label">Date</span><span class="resa-val">${formatDate(r.date_reservation)}</span></div>
+      <div class="resa-row"><span class="resa-label">Heure</span><span class="resa-val">${(r.heure || '—').substring(0,5)}</span></div>
+      <div class="resa-row"><span class="resa-label">Couverts</span><span class="resa-val">${r.nombre_personnes || '—'} pers.</span></div>
+      <div class="resa-row"><span class="resa-label">Table</span><span class="resa-val">${r.table_assignee || '—'}</span></div>
+      ${r.notes ? `<div class="resa-row"><span class="resa-label">Notes</span><span class="resa-val" style="font-size:0.8rem;max-width:60%;text-align:right">${r.notes}</span></div>` : ''}
+      ${r.occasion ? `<div style="margin-top:8px"><span class="occasion-badge">${r.occasion}</span></div>` : ''}
+    </div>`;
+}
+
+function showPinForm(r) {
+  const content = document.getElementById('content');
+  content.innerHTML = `
+    ${buildResaInfo(r)}
+    <p class="pin-label">Entrez le code à 4 chiffres pour confirmer l'arrivée</p>
+    <div class="pin-wrap">
+      <input class="pin-digit" id="p0" type="password" inputmode="numeric" maxlength="1" pattern="[0-9]">
+      <input class="pin-digit" id="p1" type="password" inputmode="numeric" maxlength="1" pattern="[0-9]">
+      <input class="pin-digit" id="p2" type="password" inputmode="numeric" maxlength="1" pattern="[0-9]">
+      <input class="pin-digit" id="p3" type="password" inputmode="numeric" maxlength="1" pattern="[0-9]">
+    </div>
+    <p class="pin-error" id="pin-error"></p>
+    <button class="btn-confirm" id="btn-checkin" onclick="verifyPin('${r.id}')">✅ Confirmer l'arrivée</button>`;
+
+  // Auto-focus et navigation entre cases
+  const inputs = [0,1,2,3].map(i => document.getElementById('p' + i));
+  inputs.forEach((inp, i) => {
+    inp.addEventListener('input', () => {
+      inp.value = inp.value.replace(/\D/g, '').slice(-1);
+      if (inp.value) {
+        inp.classList.add('filled');
+        if (i < 3) inputs[i+1].focus();
+        else verifyPin(r.id);
+      } else {
+        inp.classList.remove('filled');
+      }
+    });
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Backspace' && !inp.value && i > 0) inputs[i-1].focus();
+    });
+  });
+  inputs[0].focus();
+}
+
+function getPin() {
+  return [0,1,2,3].map(i => (document.getElementById('p' + i)?.value || '')).join('');
+}
+
+async function verifyPin(id) {
+  const entered = getPin();
+  const errEl = document.getElementById('pin-error');
+  if (entered.length < 4) { errEl.textContent = 'Entrez les 4 chiffres.'; return; }
+  if (entered !== PIN) {
+    errEl.textContent = '❌ Code incorrect. Réessayez.';
+    [0,1,2,3].forEach(i => {
+      const inp = document.getElementById('p' + i);
+      if (inp) { inp.value = ''; inp.classList.remove('filled'); }
+    });
+    document.getElementById('p0')?.focus();
+    return;
+  }
+  await doCheckin(id);
+}
+
+async function doCheckin(id) {
+  const btn = document.getElementById('btn-checkin');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enregistrement…'; }
+  try {
+    await sbFetch(`reservations?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ statut: 'Arrivé' })
+    });
+    const updated = await sbFetch(`reservations?id=eq.${id}&select=*`);
+    const content = document.getElementById('content');
+    document.getElementById('card').classList.add('success-card');
+    content.innerHTML = `
+      <div class="icon-big">✅</div>
+      <p class="state-title">Arrivée confirmée !</p>
+      <p class="state-sub" style="margin-bottom:4px">Bonne table et bon appétit 🍽️</p>
+      ${updated?.[0] ? buildResaInfo(updated[0]) : ''}`;
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Confirmer l\'arrivée'; }
+    document.getElementById('pin-error').textContent = 'Erreur : ' + e.message;
+  }
+}
+
+async function init() {
+  const params = new URLSearchParams(location.search);
+  const token  = params.get('token');
+  const id     = params.get('id');
+  const content = document.getElementById('content');
+
+  if (!token && !id) {
+    content.innerHTML = `<div class="icon-big">🔍</div><p class="state-title" style="color:var(--muted)">Aucune réservation</p><p class="state-sub">Scannez le QR code depuis l'email de confirmation.</p>`;
+    return;
+  }
+
+  let resas;
+  try {
+    if (token) resas = await sbFetch(`reservations?cancel_token=eq.${encodeURIComponent(token)}&select=*`);
+    else       resas = await sbFetch(`reservations?id=eq.${encodeURIComponent(id)}&select=*`);
+  } catch(e) {
+    content.innerHTML = `<p style="color:var(--red)">Erreur : ${e.message}</p>`;
+    return;
+  }
+
+  if (!resas || resas.length === 0) {
+    content.innerHTML = `<div class="icon-big">🔍</div><p class="state-title" style="color:var(--red)">Réservation introuvable</p>`;
+    return;
+  }
+
+  const r = resas[0];
+
+  if (r.statut === 'Arrivé') {
+    document.getElementById('card').classList.add('already-card');
+    content.innerHTML = `<div class="icon-big">🟦</div><p class="state-title">Déjà enregistré</p><p class="state-sub">Ce client a déjà été marqué comme arrivé.</p>${buildResaInfo(r)}`;
+    return;
+  }
+
+  if (r.statut === 'Annulée' || r.statut === 'No-show') {
+    document.getElementById('card').classList.add('error-card');
+    content.innerHTML = `<div class="icon-big">❌</div><p class="state-title" style="color:var(--red)">${r.statut}</p><p class="state-sub">Cette réservation est ${r.statut.toLowerCase()}.</p>${buildResaInfo(r)}`;
+    return;
+  }
+
+  showPinForm(r);
+}
+
+init();
+</script>
+</body>
+</html>
