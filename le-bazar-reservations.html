@@ -1539,6 +1539,7 @@ async function initDashboard() {
   await Promise.all([loadTables(), loadReservations(selectedDate), loadWaitlist()]);
   renderAll();
   subscribeRealtime();
+  subscribeCmdRealtime();
   hideLoading();
   startAnnulPolling();
   startCmdPolling();
@@ -3355,6 +3356,43 @@ function clearCmdBadge() {
 function closeCmdNotif() {
   const n = document.getElementById('cmd-notif');
   if (n) n.style.display = 'none';
+}
+
+// ── Realtime statut commandes ──────────────────
+let _cmdChannel = null;
+function subscribeCmdRealtime() {
+  if (_cmdChannel) { db.removeChannel(_cmdChannel); _cmdChannel = null; }
+  _cmdChannel = db.channel('commandes-status-live')
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'commandes_salle' }, (payload) => {
+      const c    = payload.new  || {};
+      const prev = payload.old  || {};
+      // Rafraîchir l'onglet commandes si ouvert
+      if (document.getElementById('view-commandes')?.style.display !== 'none') loadCommandes();
+      // Notification "Prêt"
+      if (c.statut === 'Prêt' && prev.statut !== 'Prêt') {
+        showToast('🍽️ Commande prête !', `Table ${c.table_nom}${c.serveur ? ' · ' + c.serveur : ''}`, 'new-resa');
+        playPretSound();
+      } else if (c.statut === 'En préparation' && prev.statut !== 'En préparation') {
+        showToast('👨‍🍳 En préparation', `Table ${c.table_nom}`, 'info');
+        if (document.getElementById('view-commandes')?.style.display !== 'none') loadCommandes();
+      }
+    })
+    .subscribe();
+}
+
+function playPretSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [[523,0],[659,0.14],[784,0.28],[1047,0.42]].forEach(([freq, t]) => {
+      const osc = ctx.createOscillator(); const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq; osc.type = 'sine';
+      gain.gain.setValueAtTime(0, ctx.currentTime + t);
+      gain.gain.linearRampToValueAtTime(0.20, ctx.currentTime + t + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.22);
+      osc.start(ctx.currentTime + t); osc.stop(ctx.currentTime + t + 0.25);
+    });
+  } catch(e) {}
 }
 
 // Poll every 20s for new commandes
