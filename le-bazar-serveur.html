@@ -385,6 +385,8 @@ let currentTable   = '';
 let menu           = [];   // [{categorie, items:[]}]
 let cart           = [];   // [{id, nom, categorie, prix, quantite, note}]
 let currentCat     = '';
+let _chMenu        = null;
+let _chCmd         = null;
 
 // ──────────────────────────────────────────
 // LOGIN
@@ -430,7 +432,7 @@ async function showSalle(changingTable) {
   const today = new Date().toISOString().split('T')[0];
   const [{ data: orders }, { data: resas }] = await Promise.all([
     db.from('commandes_salle').select('table_nom').in('statut', ['En attente', 'En préparation', 'Prêt']),
-    db.from('reservations').select('table_nom').eq('date_reservation', today).in('statut', ['confirmé','en_attente'])
+    db.from('reservations').select('table_nom').eq('date_reservation', today).in('statut', ['Confirmée','En attente','Arrivé'])
   ]);
 
   const occupees  = new Set((orders||[]).map(o => o.table_nom));
@@ -466,13 +468,14 @@ async function initApp() {
   document.getElementById('hdr-table').textContent      = currentTable;
   document.getElementById('hdr-serveur').textContent    = currentServeur;
   await loadMenu();
+
   // Realtime : recharge le menu si la cuisine change la dispo d'un plat
-  db.channel('menu-dispo')
+  _chMenu = db.channel('menu-dispo-srv')
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'menu' }, () => loadMenu())
     .subscribe();
 
   // Realtime : notification quand la cuisine change le statut d'une commande
-  db.channel('commandes-status-serveur')
+  _chCmd = db.channel('commandes-status-srv')
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'commandes_salle' }, (payload) => {
       const c    = payload.new || {};
       const prev = payload.old || {};
@@ -484,6 +487,11 @@ async function initApp() {
       }
     })
     .subscribe();
+
+  window.addEventListener('beforeunload', () => {
+    if (_chMenu) db.removeChannel(_chMenu);
+    if (_chCmd)  db.removeChannel(_chCmd);
+  });
 }
 
 async function loadMenu() {

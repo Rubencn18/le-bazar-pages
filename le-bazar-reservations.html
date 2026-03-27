@@ -2413,7 +2413,9 @@ function subscribeRealtime() {
 
 function cleanupRealtime() {
   if (realtimeChannel) { db.removeChannel(realtimeChannel); realtimeChannel = null; }
+  if (_cmdChannel)     { db.removeChannel(_cmdChannel);     _cmdChannel = null; }
 }
+window.addEventListener('beforeunload', cleanupRealtime);
 
 async function refreshData() {
   await Promise.all([loadReservations(selectedDate), loadWaitlist()]);
