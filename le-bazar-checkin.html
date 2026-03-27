@@ -405,39 +405,35 @@ function loadScript(src) {
 
 function handleScanned(data) {
   stopScanner();
-  const raw = (data || '').trim().replace(/\s+/g, '');
+  const raw = (data || '').trim();
 
-  // 1. URL complète avec ?token= ou ?id= ou contenant checkin
+  // 1. URL complète avec ?token= ou ?id=
   try {
     const url = new URL(raw);
     const token = url.searchParams.get('token');
     const id    = url.searchParams.get('id');
-    if (token) { window.location.href = `${location.pathname}?token=${encodeURIComponent(token)}`; return; }
-    if (id)    { window.location.href = `${location.pathname}?id=${encodeURIComponent(id)}`; return; }
-    // URL reconnue mais sans param → extraire RES- depuis le path
-    const pathMatch = url.pathname.match(/RES-[\w-]+/i);
-    if (pathMatch) { window.location.href = `${location.pathname}?id=${encodeURIComponent(pathMatch[0])}`; return; }
+    if (token) { window.location.search = `?token=${encodeURIComponent(token)}`; return; }
+    if (id)    { window.location.search = `?id=${encodeURIComponent(id)}`;       return; }
   } catch(_) {}
 
-  // 2. ID brut type RES-XXXXXXXX-XXX (avec ou sans tirets supplémentaires)
-  const resMatch = raw.match(/RES-[\d]+-[\d]+/i);
-  if (resMatch) {
-    window.location.href = `${location.pathname}?id=${encodeURIComponent(resMatch[0].toUpperCase())}`;
+  // 2. ID brut type RES-XXXXXXXX-XXX
+  if (/^RES-/i.test(raw)) {
+    window.location.search = `?id=${encodeURIComponent(raw)}`;
     return;
   }
 
-  // 3. UUID brut (cancel_token) — format 8-4-4-4-12
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
-    window.location.href = `${location.pathname}?token=${encodeURIComponent(raw)}`;
+  // 3. UUID brut (cancel_token)
+  if (/^[0-9a-f-]{36}$/i.test(raw)) {
+    window.location.search = `?token=${encodeURIComponent(raw)}`;
     return;
   }
 
-  // Non reconnu — afficher message + permettre recherche manuelle
+  // Non reconnu
   const content = document.getElementById('content');
   showSearchMode(content);
   setTimeout(() => {
     const r = document.getElementById('search-results');
-    if (r) r.innerHTML = `<p class="no-results" style="color:var(--red)">⚠️ QR non reconnu.<br><small style="word-break:break-all;opacity:.7">${raw}</small><br><span style="font-size:12px;color:var(--muted)">Recherche manuelle ci-dessus</span></p>`;
+    if (r) r.innerHTML = `<p class="no-results" style="color:var(--red)">QR non reconnu.<br><small style="word-break:break-all">${raw}</small></p>`;
   }, 30);
 }
 
