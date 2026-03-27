@@ -3176,9 +3176,9 @@ async function loadCAReelle(today, sinceStr) {
 }
 
 async function loadStats(days = window._statsPeriod || 14) {
+  const today = todayISO();
   const since = new Date(); since.setDate(since.getDate() - (days - 1));
-  const sinceStr = since.toISOString().split('T')[0];
-  const today = new Date().toISOString().split('T')[0];
+  const d = since; const sinceStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 
   const [{ data: resas }, { data: clients }, { count: newClients }, caData] = await Promise.all([
     db.from('reservations').select('date_reservation,nombre_personnes,nom_client,telephone,statut').gte('date_reservation', sinceStr),
