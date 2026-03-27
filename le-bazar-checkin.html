@@ -189,10 +189,12 @@ async function doCheckin(id) {
     const updated = await sbFetch(`reservations?id=eq.${id}&select=*`);
     const content = document.getElementById('content');
     document.getElementById('card').classList.add('success-card');
+    const nom = updated?.[0]?.nom_client || '';
     content.innerHTML = `
       <div class="icon-big">✅</div>
       <p class="state-title">Arrivée confirmée !</p>
-      <p class="state-sub" style="margin-bottom:4px">Bonne table et bon appétit 🍽️</p>
+      ${nom ? `<p style="text-align:center;font-size:1.15rem;font-weight:800;color:var(--brand);margin-bottom:4px;">${nom}</p>` : ''}
+      <p class="state-sub" style="margin-bottom:12px">Bonne table et bon appétit 🍽️</p>
       ${updated?.[0] ? buildResaInfo(updated[0]) : ''}`;
   } catch(e) {
     if (btn) { btn.disabled = false; btn.textContent = '✅ Confirmer l\'arrivée'; }
