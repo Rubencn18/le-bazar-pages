@@ -1550,7 +1550,8 @@ let realtimeChannel = null;
 let currentService = 'all';
 
 function todayISO() {
-  return new Date().toISOString().split('T')[0];
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
@@ -2110,7 +2111,12 @@ function openNewResaModal(presetTable = '') {
   document.getElementById('client-allergen-warning').style.display = 'none';
   document.querySelector('#modal-new-resa h3').textContent = 'Nouvelle réservation';
   document.getElementById('btn-submit-resa').textContent = 'Créer la réservation';
-  form.querySelector('[name=date_reservation]').value = selectedDate;
+  // Toujours prendre la date la plus récente entre selectedDate et aujourd'hui
+  // (évite de pré-remplir avec une date passée si on naviguait dans l'historique)
+  const defaultDate = selectedDate >= todayISO() ? selectedDate : todayISO();
+  const dateField = form.querySelector('[name=date_reservation]');
+  dateField.value = defaultDate;
+  dateField.min   = todayISO(); // empêche la saisie d'une date passée
   if (presetTable) form.querySelector('[name=table_assignee]').value = presetTable;
   document.getElementById('resa-statut-group').style.display = 'none';
   openModal('modal-new-resa');
