@@ -1060,7 +1060,15 @@
       </div>
     </div>
     <div class="stats-kpi-grid" id="stats-kpis"></div>
-    <div class="stats-section-title" id="stats-chart-title">Couverts par jour — 14 derniers jours</div>
+    <div id="stats-ca-section" style="margin-top:8px">
+      <div class="stats-section-title">💰 Chiffre d'affaires réel</div>
+      <div class="stats-kpi-grid" id="stats-ca-kpis" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))"></div>
+      <div id="stats-ca-tables-wrap" style="margin-top:8px;display:none">
+        <div class="stats-section-title" style="font-size:11px;margin-bottom:6px">CA par table — ce soir</div>
+        <div id="stats-ca-tables" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+      </div>
+    </div>
+    <div class="stats-section-title" id="stats-chart-title" style="margin-top:16px">Couverts par jour — 14 derniers jours</div>
     <div id="stats-chart-wrap"></div>
     <div class="stats-two-col" style="margin-top:4px">
       <div>
@@ -1071,6 +1079,10 @@
         <div class="stats-section-title">📅 Jours les plus chargés</div>
         <table class="top-table" id="stats-top-days"><tbody></tbody></table>
       </div>
+    </div>
+    <div style="margin-top:16px">
+      <div class="stats-section-title">🍽️ Top plats commandés <span id="stats-plats-period-label" style="font-weight:400;font-size:11px"></span></div>
+      <table class="top-table" id="stats-top-plats" style="width:100%"><tbody></tbody></table>
     </div>
   </div>
 
@@ -3147,14 +3159,26 @@ async function setStatsPeriod(days) {
   await loadStats(days);
 }
 
+async function loadCAReelle(today, sinceStr) {
+  try {
+    const [todayData, periodData] = await Promise.all([
+      _supaFetch(`commandes_salle?select=id,table_nom,commandes_salle_items(prix,quantite,nom)&created_at=gte.${today}T00:00:00`),
+      _supaFetch(`commandes_salle?select=id,table_nom,commandes_salle_items(prix,quantite,nom)&created_at=gte.${sinceStr}T00:00:00`)
+    ]);
+    return { today: Array.isArray(todayData) ? todayData : [], period: Array.isArray(periodData) ? periodData : [] };
+  } catch(e) { return { today: [], period: [] }; }
+}
+
 async function loadStats(days = window._statsPeriod || 14) {
   const since = new Date(); since.setDate(since.getDate() - (days - 1));
   const sinceStr = since.toISOString().split('T')[0];
+  const today = new Date().toISOString().split('T')[0];
 
-  const [{ data: resas }, { data: clients }, { count: newClients }] = await Promise.all([
+  const [{ data: resas }, { data: clients }, { count: newClients }, caData] = await Promise.all([
     db.from('reservations').select('date_reservation,nombre_personnes,nom_client,telephone,statut').gte('date_reservation', sinceStr),
     db.from('clients').select('nom,telephone,nb_reservations,nb_couverts').order('nb_reservations', { ascending: false }).limit(5),
-    db.from('clients').select('id', { count: 'exact', head: true }).gte('created_at', sinceStr)
+    db.from('clients').select('id', { count: 'exact', head: true }).gte('created_at', sinceStr),
+    loadCAReelle(today, sinceStr)
   ]);
 
   // Restore saved ticket moyen
@@ -3164,6 +3188,7 @@ async function loadStats(days = window._statsPeriod || 14) {
   window._lastStatsResas   = resas || [];
   window._lastStatsClients = clients || [];
   window._lastNewClients   = newClients || 0;
+  window._lastCAData       = caData;
   renderStats(resas || [], clients || [], days);
 }
 
@@ -3198,6 +3223,85 @@ function renderStats(resas, topClients, period = window._statsPeriod || 14) {
     <div class="stats-kpi" style="border-left-color:var(--red)"><div class="stats-kpi-val" style="color:var(--red)">${annulations.length}</div><div class="stats-kpi-label">Annulations (${periodLabel})</div></div>
     <div class="stats-kpi" style="border-left-color:#38bdf8"><div class="stats-kpi-val" style="color:#38bdf8">${newClients}</div><div class="stats-kpi-label">Nouveaux clients (${periodLabel})</div></div>
   `;
+
+  // ── CA réel ──────────────────────────────────────────────────────────────
+  const caData = window._lastCAData || { today: [], period: [] };
+
+  // Helper: sum all items in a list of commandes
+  function sumCA(commandes) {
+    return (commandes || []).reduce((total, cmd) => {
+      return total + ((cmd.commandes_salle_items || []).reduce((s, it) => s + (parseFloat(it.prix)||0) * (parseInt(it.quantite)||0), 0));
+    }, 0);
+  }
+
+  const caSoir   = sumCA(caData.today);
+  const caPeriod = sumCA(caData.period);
+  const nbCmdSoir   = (caData.today || []).length;
+  const nbCmdPeriod = (caData.period || []).length;
+  const ticketMoyenReel = nbCmdSoir > 0 ? (caSoir / nbCmdSoir).toFixed(0) : '—';
+
+  document.getElementById('stats-ca-kpis').innerHTML = `
+    <div class="stats-kpi" style="border-left-color:#22d3ee">
+      <div class="stats-kpi-val" style="color:#22d3ee">${caSoir.toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:2})} €</div>
+      <div class="stats-kpi-label">CA réel ce soir <span style="font-size:11px;font-weight:400">(${nbCmdSoir} cmd)</span></div>
+    </div>
+    <div class="stats-kpi" style="border-left-color:#4ade80">
+      <div class="stats-kpi-val" style="color:#4ade80">${caPeriod.toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:2})} €</div>
+      <div class="stats-kpi-label">CA réel (${periodLabel}) <span style="font-size:11px;font-weight:400">(${nbCmdPeriod} cmd)</span></div>
+    </div>
+    <div class="stats-kpi" style="border-left-color:#fb923c">
+      <div class="stats-kpi-val" style="color:#fb923c">${ticketMoyenReel}${ticketMoyenReel !== '—' ? ' €' : ''}</div>
+      <div class="stats-kpi-label">Ticket moyen réel / cmd (ce soir)</div>
+    </div>
+  `;
+
+  // CA par table ce soir
+  const caByTable = {};
+  (caData.today || []).forEach(cmd => {
+    const tbl = cmd.table_nom || 'Inconnue';
+    if (!caByTable[tbl]) caByTable[tbl] = 0;
+    caByTable[tbl] += (cmd.commandes_salle_items || []).reduce((s, it) => s + (parseFloat(it.prix)||0) * (parseInt(it.quantite)||0), 0);
+  });
+  const tableEntries = Object.entries(caByTable).sort((a,b) => b[1]-a[1]);
+  const caTablesWrap = document.getElementById('stats-ca-tables-wrap');
+  const caTables = document.getElementById('stats-ca-tables');
+  if (tableEntries.length > 0) {
+    caTablesWrap.style.display = '';
+    caTables.innerHTML = tableEntries.map(([tbl, ca]) => `
+      <div style="background:var(--surface2);border:1px solid var(--border2);padding:8px 14px;font-size:13px;min-width:120px;text-align:center;">
+        <div style="font-weight:700;color:var(--orange)">${tbl}</div>
+        <div style="color:#22d3ee;font-size:15px;font-weight:700;margin-top:2px">${ca.toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:2})} €</div>
+      </div>`).join('');
+  } else {
+    caTablesWrap.style.display = 'none';
+    caTables.innerHTML = '';
+  }
+
+  // Top plats commandés (sur la période)
+  const platsMap = {};
+  (caData.period || []).forEach(cmd => {
+    (cmd.commandes_salle_items || []).forEach(it => {
+      const nom = it.nom || 'Inconnu';
+      if (!platsMap[nom]) platsMap[nom] = { qte: 0, ca: 0 };
+      platsMap[nom].qte += parseInt(it.quantite) || 0;
+      platsMap[nom].ca  += (parseFloat(it.prix)||0) * (parseInt(it.quantite)||0);
+    });
+  });
+  const topPlats = Object.entries(platsMap).sort((a,b) => b[1].qte - a[1].qte).slice(0, 10);
+  const plEl = document.getElementById('stats-top-plats').querySelector('tbody');
+  const platPeriodEl = document.getElementById('stats-plats-period-label');
+  if (platPeriodEl) platPeriodEl.textContent = `— ${periodLabel}`;
+  if (topPlats.length === 0) {
+    plEl.innerHTML = '<tr><td colspan="4" style="color:var(--muted);padding:16px 12px">Aucune commande enregistrée</td></tr>';
+  } else {
+    plEl.innerHTML = topPlats.map(([nom, d], i) => `
+      <tr>
+        <td style="width:28px"><span class="rank-badge">${i+1}</span></td>
+        <td style="font-weight:600">${nom}</td>
+        <td style="color:var(--orange);font-weight:700;text-align:right">${d.qte}×</td>
+        <td style="color:#4ade80;font-weight:700;text-align:right">${d.ca.toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:2})} €</td>
+      </tr>`).join('');
+  }
 
   // Bar chart — couverts par jour
   const days = {};
