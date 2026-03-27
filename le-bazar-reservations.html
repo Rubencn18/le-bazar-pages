@@ -758,48 +758,6 @@
       display: none; align-items: center; justify-content: center; line-height: 1;
     }
 
-    /* ── Stocks tab ── */
-    #view-stocks {
-      display: none; flex: 1; overflow: auto; padding: 28px 36px;
-      flex-direction: column;
-    }
-    .stocks-grid { display: flex; flex-wrap: wrap; gap: 14px; align-content: flex-start; }
-    .stocks-cat-block { width: 280px; background: var(--surface2); border: 1px solid var(--border); }
-    .stocks-cat-title {
-      padding: 10px 16px; font-size: 9px; font-weight: 700; letter-spacing: 2px;
-      text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border);
-    }
-    .stock-row {
-      display: flex; align-items: center; padding: 9px 16px; gap: 10px;
-      border-bottom: 1px solid var(--border); transition: background .12s;
-    }
-    .stock-row:last-child { border-bottom: none; }
-    .stock-row:hover { background: rgba(255,255,255,0.03); }
-    .stock-row-nom { flex: 1; font-size: 12px; font-weight: 500; }
-    .stock-row-tag {
-      font-size: 9px; font-weight: 700; letter-spacing: 1px; padding: 2px 7px;
-      border: 1px solid rgba(224,80,80,.4); color: var(--red); background: var(--red-dim);
-      text-transform: uppercase;
-    }
-    .stock-switch { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; }
-    .stock-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
-    .stock-slide {
-      position: absolute; cursor: pointer; inset: 0; background: rgba(255,255,255,.12);
-      transition: .2s; border-radius: 20px;
-    }
-    .stock-slide::before {
-      content: ''; position: absolute; height: 14px; width: 14px; left: 3px; bottom: 3px;
-      background: #fff; border-radius: 50%; transition: .2s;
-    }
-    .stock-switch input:checked + .stock-slide { background: var(--green); }
-    .stock-switch input:checked + .stock-slide::before { transform: translateX(16px); }
-    #stocks-rupture-bar {
-      display: none; padding: 8px 16px; background: var(--red-dim);
-      border: 1px solid rgba(224,80,80,.3); border-left: 3px solid var(--red);
-      font-size: 12px; color: var(--red); font-weight: 600; margin-bottom: 20px;
-      letter-spacing: .5px;
-    }
-
     /* ── Annulations tab ── */
     #view-annulations {
       display: none; flex: 1; overflow: auto; padding: 28px 36px;
@@ -844,7 +802,7 @@
       #screen-login,#app-header,#floor-plan,.service-filter,
       #btn-new-resa,#btn-toggle-cancelled,#btn-clear-cancelled,
       #waitlist-section,.modal-overlay,#toast-container,
-      #loading-overlay,#bg-logo,#view-clients,#view-stats,#view-commandes,#view-annulations,#view-stocks,#annul-notif,#cmd-notif,
+      #loading-overlay,#bg-logo,#view-clients,#view-stats,#view-commandes,#view-annulations,#annul-notif,#cmd-notif,
       .resa-actions,#print-btn-group { display:none !important; }
       body,html { background:#fff !important; color:#000 !important; }
       #screen-dashboard { display:block !important; background:#fff !important; }
@@ -927,13 +885,6 @@
               <span class="qa-desc">Affichage temps réel des commandes</span>
             </div>
           </a>
-          <a class="qa-item" href="le-bazar-checkin.html" target="_blank">
-            <span class="qa-icon">✅</span>
-            <div class="qa-item-inner">
-              <span>Check-in</span>
-              <span class="qa-desc">Accueil et confirmation d'arrivée</span>
-            </div>
-          </a>
           <a class="qa-item" href="le-bazar-annulation.html" target="_blank">
             <span class="qa-icon">❌</span>
             <div class="qa-item-inner">
@@ -960,7 +911,6 @@
     </span>
     <span id="tab-annulations-wrap" style="position:relative;display:flex;">
       <button id="tab-annulations" class="tab-btn" onclick="switchTab('annulations')">❌ Annulations</button>
-      <button id="tab-stocks" class="tab-btn" onclick="switchTab('stocks')">📦 Stocks</button>
       <span id="annul-count-badge" style="position:absolute;top:6px;right:4px;background:var(--red);color:#fff;border-radius:50%;width:15px;height:15px;font-size:9px;font-weight:700;display:none;align-items:center;justify-content:center;line-height:1;"></span>
     </span>
   </nav>
@@ -1060,15 +1010,7 @@
       </div>
     </div>
     <div class="stats-kpi-grid" id="stats-kpis"></div>
-    <div id="stats-ca-section" style="margin-top:8px">
-      <div class="stats-section-title">💰 Chiffre d'affaires réel</div>
-      <div class="stats-kpi-grid" id="stats-ca-kpis" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))"></div>
-      <div id="stats-ca-tables-wrap" style="margin-top:8px;display:none">
-        <div class="stats-section-title" style="font-size:11px;margin-bottom:6px">CA par table — ce soir</div>
-        <div id="stats-ca-tables" style="display:flex;flex-wrap:wrap;gap:8px"></div>
-      </div>
-    </div>
-    <div class="stats-section-title" id="stats-chart-title" style="margin-top:16px">Couverts par jour — 14 derniers jours</div>
+    <div class="stats-section-title" id="stats-chart-title">Couverts par jour — 14 derniers jours</div>
     <div id="stats-chart-wrap"></div>
     <div class="stats-two-col" style="margin-top:4px">
       <div>
@@ -1079,10 +1021,6 @@
         <div class="stats-section-title">📅 Jours les plus chargés</div>
         <table class="top-table" id="stats-top-days"><tbody></tbody></table>
       </div>
-    </div>
-    <div style="margin-top:16px">
-      <div class="stats-section-title">🍽️ Top plats commandés <span id="stats-plats-period-label" style="font-weight:400;font-size:11px"></span></div>
-      <table class="top-table" id="stats-top-plats" style="width:100%"><tbody></tbody></table>
     </div>
   </div>
 
@@ -1183,23 +1121,9 @@
     </div>
   </div>
 
-  <!-- ══ VUE STOCKS ══ -->
-  <div id="view-stocks">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
-      <div>
-        <div style="font-size:18px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">📦 Gestion des stocks</div>
-        <div style="color:var(--muted);font-size:12px;margin-top:4px;" id="stocks-subtitle">Chargement…</div>
-      </div>
-      <button onclick="loadStocksView()" style="padding:8px 14px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-size:12px;cursor:pointer;" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">🔄 Actualiser</button>
-    </div>
-    <div id="stocks-rupture-bar">⚠️ <span id="stocks-rupture-count">0</span> plat(s) en rupture de stock</div>
-    <div class="stocks-grid" id="stocks-grid">Chargement…</div>
-  </div>
-
 </div>
 
 <!-- ══ NOTIFICATION ANNULATION ══ -->
-
 <div id="annul-notif">
   <button class="annul-notif-close" onclick="closeAnnulNotif()">✕</button>
   <div class="annul-notif-title">❌ Nouvelle annulation</div>
@@ -1550,8 +1474,7 @@ let realtimeChannel = null;
 let currentService = 'all';
 
 function todayISO() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  return new Date().toISOString().split('T')[0];
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
@@ -2111,12 +2034,7 @@ function openNewResaModal(presetTable = '') {
   document.getElementById('client-allergen-warning').style.display = 'none';
   document.querySelector('#modal-new-resa h3').textContent = 'Nouvelle réservation';
   document.getElementById('btn-submit-resa').textContent = 'Créer la réservation';
-  // Toujours prendre la date la plus récente entre selectedDate et aujourd'hui
-  // (évite de pré-remplir avec une date passée si on naviguait dans l'historique)
-  const defaultDate = selectedDate >= todayISO() ? selectedDate : todayISO();
-  const dateField = form.querySelector('[name=date_reservation]');
-  dateField.value = defaultDate;
-  dateField.min   = todayISO(); // empêche la saisie d'une date passée
+  form.querySelector('[name=date_reservation]').value = selectedDate;
   if (presetTable) form.querySelector('[name=table_assignee]').value = presetTable;
   document.getElementById('resa-statut-group').style.display = 'none';
   openModal('modal-new-resa');
@@ -2253,36 +2171,15 @@ document.getElementById('btn-submit-resa').addEventListener('click', async () =>
       if (error) throw error;
       showToast('Réservation modifiée ✓', `${payload.nom_client} — ${payload.heure}`, 'success');
     } else if (USE_N8N_WEBHOOK) {
-      // Pré-générer ID et cancel_token pour que N8N puisse les utiliser dans l'email
-      const tableId = payload.table_assignee || await findAvailableTable(payload.date, payload.heure, payload.nombre_personnes);
-      if (!tableId) {
-        btn.textContent = editId ? 'Enregistrer les modifications' : 'Créer la réservation'; btn.disabled = false;
-        openWaitlistModal({ nom_client: payload.nom_client, telephone: payload.telephone, email: payload.email, date: payload.date, heure: payload.heure, nombre_personnes: payload.nombre_personnes });
-        return;
-      }
-      const resaId = 'RES-' + payload.date.replace(/-/g,'') + '-' + Date.now().toString().slice(-6);
-      const cancelToken = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
-      const checkinUrl = `https://bazar.ia.conceptnumerique.fr/le-bazar-checkin.html?token=${encodeURIComponent(cancelToken)}`;
-      const qrImgUrl   = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&bgcolor=FFFFFF&color=1a1a1a&data=${encodeURIComponent(checkinUrl)}`;
-
       // Via N8N webhook (emails inclus)
       const res = await fetch(N8N_WEBHOOK_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...payload,
-          id:            resaId,
-          cancel_token:  cancelToken,
-          table_assignee: tableId,
-          checkin_url:   checkinUrl,
-          qr_img_url:    qrImgUrl,
-        }),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.message || 'Erreur webhook');
-      showToast('Réservation créée ✓', `${payload.nom_client} — Table ${tableId}`, 'success');
-      // Afficher le QR dans l'admin pour que le staff puisse aussi le montrer
-      showCheckinQR(cancelToken, payload.nom_client);
+      showToast('Réservation créée ✓', `${payload.nom_client} — ${payload.heure}`, 'success');
     } else {
       // Direct Supabase
       const id = 'RES-' + payload.date.replace(/-/g,'') + '-' + Date.now().toString().slice(-6);
@@ -2328,13 +2225,12 @@ let allClients = [];
 let currentEditClientId = null;
 
 function switchTab(tab) {
-  const tabs = ['reservations','clients','stats','commandes','annulations','stocks'];
+  const tabs = ['reservations','clients','stats','commandes','annulations'];
   document.getElementById('app-main').style.display         = tab === 'reservations' ? 'flex' : 'none';
   document.getElementById('view-clients').style.display      = tab === 'clients' ? 'flex' : 'none';
   document.getElementById('view-stats').style.display        = tab === 'stats' ? 'flex' : 'none';
   document.getElementById('view-commandes').style.display    = tab === 'commandes' ? 'flex' : 'none';
   document.getElementById('view-annulations').style.display  = tab === 'annulations' ? 'flex' : 'none';
-  document.getElementById('view-stocks').style.display       = tab === 'stocks' ? 'flex' : 'none';
   tabs.forEach(t => {
     const btn = document.getElementById('tab-' + t);
     if (!btn) return;
@@ -2344,7 +2240,6 @@ function switchTab(tab) {
   if (tab === 'stats')       loadStats();
   if (tab === 'commandes')   { loadCommandes(); clearCmdBadge(); }
   if (tab === 'annulations') { loadAnnulations(); clearAnnulBadge(); }
-  if (tab === 'stocks')      loadStocksView();
 }
 
 async function loadClients() {
@@ -3165,26 +3060,14 @@ async function setStatsPeriod(days) {
   await loadStats(days);
 }
 
-async function loadCAReelle(today, sinceStr) {
-  try {
-    const [todayData, periodData] = await Promise.all([
-      _supaFetch(`commandes_salle?select=id,table_nom,commandes_salle_items(prix,quantite,nom)&created_at=gte.${today}T00:00:00`),
-      _supaFetch(`commandes_salle?select=id,table_nom,commandes_salle_items(prix,quantite,nom)&created_at=gte.${sinceStr}T00:00:00`)
-    ]);
-    return { today: Array.isArray(todayData) ? todayData : [], period: Array.isArray(periodData) ? periodData : [] };
-  } catch(e) { return { today: [], period: [] }; }
-}
-
 async function loadStats(days = window._statsPeriod || 14) {
-  const today = todayISO();
   const since = new Date(); since.setDate(since.getDate() - (days - 1));
-  const d = since; const sinceStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const sinceStr = since.toISOString().split('T')[0];
 
-  const [{ data: resas }, { data: clients }, { count: newClients }, caData] = await Promise.all([
+  const [{ data: resas }, { data: clients }, { count: newClients }] = await Promise.all([
     db.from('reservations').select('date_reservation,nombre_personnes,nom_client,telephone,statut').gte('date_reservation', sinceStr),
     db.from('clients').select('nom,telephone,nb_reservations,nb_couverts').order('nb_reservations', { ascending: false }).limit(5),
-    db.from('clients').select('id', { count: 'exact', head: true }).gte('created_at', sinceStr),
-    loadCAReelle(today, sinceStr)
+    db.from('clients').select('id', { count: 'exact', head: true }).gte('created_at', sinceStr)
   ]);
 
   // Restore saved ticket moyen
@@ -3194,7 +3077,6 @@ async function loadStats(days = window._statsPeriod || 14) {
   window._lastStatsResas   = resas || [];
   window._lastStatsClients = clients || [];
   window._lastNewClients   = newClients || 0;
-  window._lastCAData       = caData;
   renderStats(resas || [], clients || [], days);
 }
 
@@ -3229,85 +3111,6 @@ function renderStats(resas, topClients, period = window._statsPeriod || 14) {
     <div class="stats-kpi" style="border-left-color:var(--red)"><div class="stats-kpi-val" style="color:var(--red)">${annulations.length}</div><div class="stats-kpi-label">Annulations (${periodLabel})</div></div>
     <div class="stats-kpi" style="border-left-color:#38bdf8"><div class="stats-kpi-val" style="color:#38bdf8">${newClients}</div><div class="stats-kpi-label">Nouveaux clients (${periodLabel})</div></div>
   `;
-
-  // ── CA réel ──────────────────────────────────────────────────────────────
-  const caData = window._lastCAData || { today: [], period: [] };
-
-  // Helper: sum all items in a list of commandes
-  function sumCA(commandes) {
-    return (commandes || []).reduce((total, cmd) => {
-      return total + ((cmd.commandes_salle_items || []).reduce((s, it) => s + (parseFloat(it.prix)||0) * (parseInt(it.quantite)||0), 0));
-    }, 0);
-  }
-
-  const caSoir   = sumCA(caData.today);
-  const caPeriod = sumCA(caData.period);
-  const nbCmdSoir   = (caData.today || []).length;
-  const nbCmdPeriod = (caData.period || []).length;
-  const ticketMoyenReel = nbCmdSoir > 0 ? (caSoir / nbCmdSoir).toFixed(0) : '—';
-
-  document.getElementById('stats-ca-kpis').innerHTML = `
-    <div class="stats-kpi" style="border-left-color:#22d3ee">
-      <div class="stats-kpi-val" style="color:#22d3ee">${caSoir.toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:2})} €</div>
-      <div class="stats-kpi-label">CA réel ce soir <span style="font-size:11px;font-weight:400">(${nbCmdSoir} cmd)</span></div>
-    </div>
-    <div class="stats-kpi" style="border-left-color:#4ade80">
-      <div class="stats-kpi-val" style="color:#4ade80">${caPeriod.toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:2})} €</div>
-      <div class="stats-kpi-label">CA réel (${periodLabel}) <span style="font-size:11px;font-weight:400">(${nbCmdPeriod} cmd)</span></div>
-    </div>
-    <div class="stats-kpi" style="border-left-color:#fb923c">
-      <div class="stats-kpi-val" style="color:#fb923c">${ticketMoyenReel}${ticketMoyenReel !== '—' ? ' €' : ''}</div>
-      <div class="stats-kpi-label">Ticket moyen réel / cmd (ce soir)</div>
-    </div>
-  `;
-
-  // CA par table ce soir
-  const caByTable = {};
-  (caData.today || []).forEach(cmd => {
-    const tbl = cmd.table_nom || 'Inconnue';
-    if (!caByTable[tbl]) caByTable[tbl] = 0;
-    caByTable[tbl] += (cmd.commandes_salle_items || []).reduce((s, it) => s + (parseFloat(it.prix)||0) * (parseInt(it.quantite)||0), 0);
-  });
-  const tableEntries = Object.entries(caByTable).sort((a,b) => b[1]-a[1]);
-  const caTablesWrap = document.getElementById('stats-ca-tables-wrap');
-  const caTables = document.getElementById('stats-ca-tables');
-  if (tableEntries.length > 0) {
-    caTablesWrap.style.display = '';
-    caTables.innerHTML = tableEntries.map(([tbl, ca]) => `
-      <div style="background:var(--surface2);border:1px solid var(--border2);padding:8px 14px;font-size:13px;min-width:120px;text-align:center;">
-        <div style="font-weight:700;color:var(--orange)">${tbl}</div>
-        <div style="color:#22d3ee;font-size:15px;font-weight:700;margin-top:2px">${ca.toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:2})} €</div>
-      </div>`).join('');
-  } else {
-    caTablesWrap.style.display = 'none';
-    caTables.innerHTML = '';
-  }
-
-  // Top plats commandés (sur la période)
-  const platsMap = {};
-  (caData.period || []).forEach(cmd => {
-    (cmd.commandes_salle_items || []).forEach(it => {
-      const nom = it.nom || 'Inconnu';
-      if (!platsMap[nom]) platsMap[nom] = { qte: 0, ca: 0 };
-      platsMap[nom].qte += parseInt(it.quantite) || 0;
-      platsMap[nom].ca  += (parseFloat(it.prix)||0) * (parseInt(it.quantite)||0);
-    });
-  });
-  const topPlats = Object.entries(platsMap).sort((a,b) => b[1].qte - a[1].qte).slice(0, 10);
-  const plEl = document.getElementById('stats-top-plats').querySelector('tbody');
-  const platPeriodEl = document.getElementById('stats-plats-period-label');
-  if (platPeriodEl) platPeriodEl.textContent = `— ${periodLabel}`;
-  if (topPlats.length === 0) {
-    plEl.innerHTML = '<tr><td colspan="4" style="color:var(--muted);padding:16px 12px">Aucune commande enregistrée</td></tr>';
-  } else {
-    plEl.innerHTML = topPlats.map(([nom, d], i) => `
-      <tr>
-        <td style="width:28px"><span class="rank-badge">${i+1}</span></td>
-        <td style="font-weight:600">${nom}</td>
-        <td style="color:var(--orange);font-weight:700;text-align:right">${d.qte}×</td>
-        <td style="color:#4ade80;font-weight:700;text-align:right">${d.ca.toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:2})} €</td>
-      </tr>`).join('');
-  }
 
   // Bar chart — couverts par jour
   const days = {};
@@ -3598,131 +3401,6 @@ async function pollCommandes() {
 function startCmdPolling() {
   pollCommandes();
   _cmdPollTimer = setInterval(pollCommandes, 20000);
-}
-
-// ═══════════════════════════════════════════
-// 📦 GESTION DES STOCKS
-// ═══════════════════════════════════════════
-let _stockItems = [];
-let _stockIngredients = [];
-let _menuIngrMap = {}; // ingredient_id → [menu_ids]
-let _itemIngrMap = {}; // menu_id       → [ingredient_ids]
-
-async function _supaFetch(path) {
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
-  });
-  return r.ok ? r.json() : [];
-}
-
-async function loadStocksView() {
-  document.getElementById('stocks-grid').innerHTML = '<div style="color:var(--muted);padding:20px">Chargement…</div>';
-  const [menuRes, ingrData, linkData] = await Promise.all([
-    db.from('menu').select('id,nom,categorie,disponible').order('categorie').order('ordre'),
-    _supaFetch('ingredients?select=id,nom,disponible&order=nom'),
-    _supaFetch('menu_ingredients?select=menu_id,ingredient_id')
-  ]);
-  _stockItems       = menuRes.data || [];
-  _stockIngredients = ingrData || [];
-  _menuIngrMap = {}; _itemIngrMap = {};
-  (linkData || []).forEach(({ menu_id, ingredient_id }) => {
-    if (!_menuIngrMap[ingredient_id]) _menuIngrMap[ingredient_id] = [];
-    _menuIngrMap[ingredient_id].push(menu_id);
-    if (!_itemIngrMap[menu_id]) _itemIngrMap[menu_id] = [];
-    _itemIngrMap[menu_id].push(ingredient_id);
-  });
-  renderStocksView();
-}
-
-function renderStocksView() {
-  const ingrRuptures    = _stockIngredients.filter(i => !i.disponible).length;
-  const linkedIds       = new Set(Object.keys(_itemIngrMap).map(Number));
-  const manualRuptures  = _stockItems.filter(m => !m.disponible && !linkedIds.has(m.id)).length;
-  const totalRuptures   = ingrRuptures + manualRuptures;
-
-  const bar = document.getElementById('stocks-rupture-bar');
-  bar.style.display = totalRuptures > 0 ? 'block' : 'none';
-  document.getElementById('stocks-rupture-count').textContent = totalRuptures;
-  document.getElementById('stocks-subtitle').textContent =
-    totalRuptures > 0 ? `${totalRuptures} rupture${totalRuptures > 1 ? 's' : ''}` : 'Tous les ingrédients sont disponibles';
-
-  // Bloc ingrédients clés
-  const ingrBlock = `
-    <div class="stocks-cat-block" style="width:320px">
-      <div class="stocks-cat-title" style="color:var(--orange)">🧂 Ingrédients clés</div>
-      ${_stockIngredients.map(ingr => {
-        const n = (_menuIngrMap[ingr.id] || []).length;
-        return `<div class="stock-row">
-          <div class="stock-row-nom">${ingr.nom} <span style="font-size:10px;color:var(--muted);font-weight:400">${n} plat${n>1?'s':''}</span></div>
-          ${!ingr.disponible ? '<span class="stock-row-tag">Rupture</span>' : ''}
-          <label class="stock-switch">
-            <input type="checkbox" ${ingr.disponible?'checked':''} onchange="toggleStockIngredient(${ingr.id},this.checked)">
-            <span class="stock-slide"></span>
-          </label>
-        </div>`;
-      }).join('')}
-    </div>`;
-
-  // Blocs autres plats (non liés)
-  const manualItems = _stockItems.filter(m => !linkedIds.has(m.id));
-  const cats = {};
-  manualItems.forEach(m => { const c = m.categorie||'Autre'; if (!cats[c]) cats[c]=[]; cats[c].push(m); });
-  const manualBlocks = Object.entries(cats).map(([cat, items]) => `
-    <div class="stocks-cat-block">
-      <div class="stocks-cat-title">${cat.replace(/^Midi\//,'🌞 ')}</div>
-      ${items.map(item => `<div class="stock-row">
-        <div class="stock-row-nom">${item.nom}</div>
-        ${!item.disponible ? '<span class="stock-row-tag">Rupture</span>' : ''}
-        <label class="stock-switch">
-          <input type="checkbox" ${item.disponible?'checked':''} onchange="toggleStockItem(${item.id},this.checked)">
-          <span class="stock-slide"></span>
-        </label>
-      </div>`).join('')}
-    </div>`).join('');
-
-  document.getElementById('stocks-grid').innerHTML = ingrBlock + manualBlocks;
-}
-
-async function toggleStockIngredient(ingrId, disponible) {
-  const ingr = _stockIngredients.find(i => i.id === ingrId);
-  if (ingr) ingr.disponible = disponible;
-  const affected = _menuIngrMap[ingrId] || [];
-  affected.forEach(mid => {
-    const item = _stockItems.find(m => m.id === mid);
-    if (!item) return;
-    if (!disponible) {
-      item.disponible = false;
-    } else {
-      const allOk = (_itemIngrMap[mid] || []).every(iid => {
-        const i = _stockIngredients.find(x => x.id === iid);
-        return i ? i.disponible : true;
-      });
-      if (allOk) item.disponible = true;
-    }
-  });
-  renderStocksView();
-  await fetch(`${SUPABASE_URL}/rest/v1/ingredients?id=eq.${ingrId}`, {
-    method: 'PATCH',
-    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ disponible })
-  });
-  if (affected.length > 0) {
-    if (!disponible) {
-      await db.from('menu').update({ disponible: false }).in('id', affected);
-    } else {
-      const toEnable = affected.filter(mid =>
-        (_itemIngrMap[mid] || []).every(iid => { const i = _stockIngredients.find(x=>x.id===iid); return i?i.disponible:true; })
-      );
-      if (toEnable.length > 0) await db.from('menu').update({ disponible: true }).in('id', toEnable);
-    }
-  }
-}
-
-async function toggleStockItem(itemId, disponible) {
-  const item = _stockItems.find(i => i.id === itemId);
-  if (item) item.disponible = disponible;
-  renderStocksView();
-  await db.from('menu').update({ disponible }).eq('id', itemId);
 }
 </script>
 </body>
