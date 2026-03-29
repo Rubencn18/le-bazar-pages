@@ -387,6 +387,7 @@ let cart           = [];   // [{id, nom, categorie, prix, quantite, note}]
 let currentCat     = '';
 let _chMenu        = null;
 let _chCmd         = null;
+let _cmdStatutCache = {};   // id → statut (pour détecter les vrais changements)
 let _srvAudioCtx   = null;
 function getSrvAudioCtx() {
   if (!_srvAudioCtx || _srvAudioCtx.state === 'closed')
@@ -437,10 +438,12 @@ async function showSalle(changingTable) {
 
   // Load statuses
   const today = new Date().toISOString().split('T')[0];
-  const [{ data: orders }, { data: resas }] = await Promise.all([
+  const [{ data: orders }, { data: resas }, { data: allCmds }] = await Promise.all([
     db.from('commandes_salle').select('table_nom').in('statut', ['En attente', 'En préparation', 'Prêt']),
-    db.from('reservations').select('table_nom').eq('date_reservation', today).in('statut', ['Confirmée','En attente','Arrivé'])
+    db.from('reservations').select('table_nom').eq('date_reservation', today).in('statut', ['Confirmée','En attente','Arrivé']),
+    db.from('commandes_salle').select('id,statut').not('statut', 'eq', 'Archivé')
   ]);
+  (allCmds || []).forEach(c => { _cmdStatutCache[c.id] = c.statut; });
 
   const occupees  = new Set((orders||[]).map(o => o.table_nom));
   const reservees = new Set((resas||[]).map(r => r.table_nom).filter(n => !occupees.has(n)));
@@ -484,19 +487,20 @@ async function initApp() {
   // Realtime : notification quand la cuisine change le statut d'une commande
   _chCmd = db.channel('commandes-status-srv')
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'commandes_salle' }, (payload) => {
-      const c    = payload.new || {};
-      const prev = payload.old || {};
+      const c        = payload.new || {};
+      const prevStat = _cmdStatutCache[c.id];
       const isMyTable = c.table_nom === currentTable;
-      if (c.statut === 'Prêt' && prev.statut !== 'Prêt') {
+      if (c.statut === 'Prêt' && prevStat !== 'Prêt') {
         if (isMyTable) {
           showToast(`🍽️ VOTRE TABLE — Commande PRÊTE !`);
           playPretSound();
         } else {
           showToast(`🍽️ Table ${c.table_nom} prête`);
         }
-      } else if (c.statut === 'En préparation' && prev.statut !== 'En préparation' && isMyTable) {
+      } else if (c.statut === 'En préparation' && prevStat !== 'En préparation' && isMyTable) {
         showToast(`👨‍🍳 Votre commande est en préparation`);
       }
+      _cmdStatutCache[c.id] = c.statut;
     })
     .subscribe();
 

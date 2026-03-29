@@ -3298,6 +3298,7 @@ async function loadCommandes() {
     .order('created_at', { ascending: true });
   if (error) { if (board) board.innerHTML = '<div style="color:var(--red);padding:20px">Erreur chargement commandes.</div>'; return; }
   _cmdCache = (data || []).map(c => ({ ...c, items: c.commandes_salle_items || [] }));
+  _cmdCache.forEach(c => { _cmdStatutCache[c.id] = c.statut; });
   if (label) label.textContent = _cmdCache.length + ' commande' + (_cmdCache.length > 1 ? 's' : '') + ' active' + (_cmdCache.length > 1 ? 's' : '');
   renderCommandes();
 }
@@ -3369,22 +3370,24 @@ function closeCmdNotif() {
 
 // ── Realtime statut commandes ──────────────────
 let _cmdChannel = null;
+let _cmdStatutCache = {};   // id → statut (pour détecter les vrais changements)
+
 function subscribeCmdRealtime() {
   if (_cmdChannel) { db.removeChannel(_cmdChannel); _cmdChannel = null; }
   _cmdChannel = db.channel('commandes-status-live')
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'commandes_salle' }, (payload) => {
-      const c    = payload.new  || {};
-      const prev = payload.old  || {};
+      const c        = payload.new || {};
+      const prevStat = _cmdStatutCache[c.id];
       // Rafraîchir l'onglet commandes si ouvert
       if (document.getElementById('view-commandes')?.style.display !== 'none') loadCommandes();
       // Notification "Prêt"
-      if (c.statut === 'Prêt' && prev.statut !== 'Prêt') {
+      if (c.statut === 'Prêt' && prevStat !== 'Prêt') {
         showToast('🍽️ Commande prête !', `Table ${c.table_nom}${c.serveur ? ' · ' + c.serveur : ''}`, 'new-resa');
         playPretSound();
-      } else if (c.statut === 'En préparation' && prev.statut !== 'En préparation') {
+      } else if (c.statut === 'En préparation' && prevStat !== 'En préparation') {
         showToast('👨‍🍳 En préparation', `Table ${c.table_nom}`, 'info');
-        if (document.getElementById('view-commandes')?.style.display !== 'none') loadCommandes();
       }
+      _cmdStatutCache[c.id] = c.statut;
     })
     .subscribe();
 }
